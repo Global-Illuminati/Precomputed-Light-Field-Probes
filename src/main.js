@@ -472,7 +472,7 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 function setupProbeDrawCall(vertexArray, shader) {
 
 	// We need at least one (x,y,z) pair to render any probes
-	if (probeLocations.length <= 3) {
+	if (probeLocations.length < 3) {
 		return;
 	}
 
