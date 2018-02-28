@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>GI Core Framework</title>
+		<style>
+			html, body, head, canvas {
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas"></canvas>
+
+		<!-- core -->
+		<script src="deps/picogl.js" charset="utf-8"></script>
+		<script src="deps/gl-matrix.js" charset="utf-8"></script>
+
+		<!-- asset loading -->
+		<script src="deps/OBJLoader.js" charset="utf-8"></script>
+		<script src="deps/MTLLoader.js" charset="utf-8"></script>
+
+		<!-- stats & gui -->
+		<script src="deps/stats.min.js" charset="utf-8"></script>
+		<script src="deps/dat.gui.min.js" charset="utf-8"></script>
+
+		<script src="src/Camera.js" charset="utf-8"></script>
+		<script src="src/ShaderLoader.js" charset="utf-8"></script>
+		<script src="src/DirectionalLight.js" charset="utf-8"></script>
+		<script src="src/main.js" charset="utf-8"></script>
+	</body>
+</html>

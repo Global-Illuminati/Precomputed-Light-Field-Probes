@@ -1,0 +1,14 @@
+.vscode/*
+**/.vs/*
+**/Debug/*
+**/Release/*
+# macOS specific files
+.DS_Store
+*.db
+*.sou
+**/ipch/*
+*.opendb
+*.TMP
+
+# Webstorm
+.idea/
