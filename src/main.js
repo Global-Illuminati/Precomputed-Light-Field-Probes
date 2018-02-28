@@ -39,9 +39,6 @@ var meshes = [];
 var probeDrawCall;
 var probeLocations = [
 	-10, 4,  0,
-	+10, 4,  0,
-	-10, 14, 0,
-	+10, 14, 0
 ]
 
 window.addEventListener('DOMContentLoaded', function () {
@@ -217,6 +214,103 @@ function init() {
 		defaultShader = makeShader('default', data);
 		shadowMapShader = makeShader('shadowMapping', data);
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
+
+
+		var radianceCubeMap = app.createCubemap({
+			negX: new Image(1024, 1024),
+			posX: new Image(1024, 1024),
+			negY: new Image(1024, 1024),
+			posY: new Image(1024, 1024),
+			negZ: new Image(1024, 1024),
+			posZ: new Image(1024, 1024),
+		});
+
+		var depthCubeMap = app.createCubemap({
+			negX: new Image(1024, 1024),
+			posX: new Image(1024, 1024),
+			negY: new Image(1024, 1024),
+			posY: new Image(1024, 1024),
+			negZ: new Image(1024, 1024),
+			posZ: new Image(1024, 1024),
+		});
+
+		var normalCubeMap = app.createCubemap({
+			negX: new Image(1024, 1024),
+			posX: new Image(1024, 1024),
+			negY: new Image(1024, 1024),
+			posY: new Image(1024, 1024),
+			negZ: new Image(1024, 1024),
+			posZ: new Image(1024, 1024),
+		});
+
+		var frameBuffer = app.createFramebuffer();
+
+		var projectionMatrix = mat4.create();
+		mat4.perspective(projectionMatrix, Math.PI/2, 1, 0.1, 1000)
+
+		var cameraPosition = new Float32Array(probeLocations);
+
+		var ENV_CUBE_LOOK_DIR = [
+		 	vec3.fromValues(1.0, 0.0, 0.0),
+		  vec3.fromValues(-1.0, 0.0, 0.0),
+		  vec3.fromValues(0.0, 1.0, 0.0),
+		 	vec3.fromValues(0.0, -1.0, 0.0),
+	   	vec3.fromValues(0.0, 0.0, 1.0),
+	 		vec3.fromValues(0.0, 0.0, -1.0)
+		];
+
+		var ENV_CUBE_LOOK_UP = [
+			vec3.fromValues(0.0, -1.0, 0.0),
+			vec3.fromValues(0.0, -1.0, 0.0),
+		 	vec3.fromValues(0.0, 0.0, 1.0),
+		 	vec3.fromValues(0.0, 0.0, -1.0),
+	  	vec3.fromValues(0.0, -1.0, 0.0),
+	  	vec3.fromValues(0.0, -1.0, 0.0)
+		];
+
+		for (var side = 0; side < 6; side++) {
+			var viewMatrix = mat4.create();
+			var lookPos = vec3.add(vec3.create(), ENV_CUBE_LOOK_DIR[side], cameraPosition);
+			mat4.lookAt(viewMatrix, cameraPosition, lookPos, ENV_CUBE_LOOK_UP[side]);
+
+			frameBuffer.colorTarget(0, radianceCubeMap, PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X+side)
+			frameBuffer.depthTarget(depthCubeMap, PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X+side)
+
+
+
+			var matrix3 = mat3.create();
+			mat3.fromMat4(matrix3, viewMatrix);
+			var quaternion = quat.create();
+			quat.fromMat3(quaternion, matrix3);
+			var cam = {orientation: quaternion};
+
+			var dirLightViewDirection = directionalLight.viewSpaceDirection(cam);
+			var lightViewProjection = directionalLight.getLightViewProjectionMatrix();
+			var shadowMap = shadowMapFramebuffer.depthTexture;
+
+			app.drawFramebuffer(frameBuffer)
+			.viewport(0, 0, 1024, 1024)
+			.depthTest()
+			.depthFunc(PicoGL.LEQUAL)
+			.noBlend()
+			.clear();
+
+			for (var i = 0, len = meshes.length; i < len; ++i) {
+
+				var mesh = meshes[i];
+
+				mesh.drawCall
+				.uniform('u_world_from_local', mesh.modelMatrix)
+				.uniform('u_view_from_world', viewMatrix)
+				.uniform('u_projection_from_view', projectionMatrix)
+				.uniform('u_dir_light_color', directionalLight.color)
+				.uniform('u_dir_light_view_direction', dirLightViewDirection)
+				.uniform('u_light_projection_from_world', lightViewProjection)
+				.texture('u_shadow_map', shadowMap)
+				.draw();
+
+			}
+		}
 
 	});
 
