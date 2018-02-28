@@ -145,8 +145,6 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 ////////////////////////////////////////////////////////////////////////////////
 // Initialization etc.
 
-var testImage;
-
 function init() {
 
 	if (!checkWebGL2Compability()) {
@@ -217,39 +215,20 @@ function init() {
 		shadowMapShader = makeShader('shadowMapping', data);
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 
-		var images = [];
-		for (var i = 0; i < 6 * 3; i++) {
-			var img = new Image(128, 128);
-			img.src = 'assets/default_diffuse.png';
-			images.push(img);
-		}
-
 		var radianceCubeMap = app.createCubemap({
-			negX: images[0],
-			posX: images[1],
-			negY: images[2],
-			posY: images[3],
-			negZ: images[4],
-			posZ: images[5]
+			width: 1024,
+			height: 1024
 		});
 
 		var depthCubeMap = app.createCubemap({
-			negX: images[6],
-			posX: images[7],
-			negY: images[8],
-			posY: images[9],
-			negZ: images[10],
-			posZ: images[11],
+			width: 1024,
+			height: 1024,
 			format: PicoGL.DEPTH_COMPONENT
 		});
 
 		var normalCubeMap = app.createCubemap({
-			negX: images[12],
-			posX: images[13],
-			negY: images[14],
-			posY: images[15],
-			negZ: images[16],
-			posZ: images[17]
+			width: 1024,
+			height: 1024
 		});
 
 		var frameBuffer = app.createFramebuffer();
@@ -321,10 +300,6 @@ function init() {
 
 			}
 		}
-
-		//testImage = radianceCubeMap.texture;
-
-
 
 	});
 
@@ -524,10 +499,6 @@ function render() {
 
 		// Call this to get a debug render of the passed in texture
 		//renderTextureToScreen(shadowMap);
-
-		if (testImage) {
-			renderTextureToScreen(testImage);
-		}
 
 	}
 	picoTimer.end();

@@ -2386,7 +2386,7 @@ class Cubemap {
 
         let levels = generateMipmaps ? Math.floor(Math.log2(Math.min(width, height))) + 1 : 1;
         gl.texStorage2D(gl.TEXTURE_CUBE_MAP, levels, this.internalFormat, width, height);
-/*
+
         if (negX) {
             gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, 0, 0, width, height, this.format, this.type, negX);
             gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0, 0, width, height, this.format, this.type, posX);
@@ -2399,7 +2399,7 @@ class Cubemap {
         if (generateMipmaps) {
             gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
         }
-*/
+
     }
 
     /**
