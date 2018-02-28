@@ -25,6 +25,7 @@ uniform vec3 u_dir_light_color;
 uniform vec3 u_dir_light_view_direction;
 
 layout(location = 0) out vec4 o_color;
+layout(location = 1) out vec4 o_normal;
 
 void main()
 {
@@ -80,7 +81,7 @@ void main()
 		color += visibility * shininess * specular * u_dir_light_color;
 	}
 
-	// output tangents
 	o_color = vec4(color, 1.0);
+	o_normal = vec4(N * vec3(0.5) + vec3(0.5), 1.0);
 
 }

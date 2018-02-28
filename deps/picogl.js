@@ -875,7 +875,7 @@ module.exports = TEXTURE_FORMAT_DEFAULTS;
     @prop {WebGLShader} shader The shader.
 */
 class Shader {
-    
+
     constructor(gl, type, source) {
         this.gl = gl;
         this.shader = gl.createShader(type);
@@ -951,7 +951,7 @@ module.exports = Shader;
     @prop {WebGLQuery} query Query object.
     @prop {GLEnum} target The type of information being queried.
     @prop {boolean} active Whether or not a query is currently in progress.
-    @prop {Any} result The result of the query (only available after a call to ready() returns true). 
+    @prop {Any} result The result of the query (only available after a call to ready() returns true).
 */
 class Query {
 
@@ -1003,7 +1003,7 @@ class Query {
         if (this.active && this.gl.getQueryParameter(this.query, this.gl.QUERY_RESULT_AVAILABLE)) {
             this.active = false;
             // Note(Tarek): Casting because FF incorrectly returns booleans.
-            // https://bugzilla.mozilla.org/show_bug.cgi?id=1422714 
+            // https://bugzilla.mozilla.org/show_bug.cgi?id=1422714
             this.result = Number(this.gl.getQueryParameter(this.query, this.gl.QUERY_RESULT));
             return true;
         }
@@ -1084,7 +1084,7 @@ PicoGL.version = "0.8.8";
 PicoGL.createApp = function(canvas, contextAttributes) {
     return new App(canvas, contextAttributes);
 };
-    
+
 module.exports = PicoGL;
 
 
@@ -1150,10 +1150,10 @@ const Query                   = __webpack_require__(3);
     @prop {boolean} astcTexturesEnabled Whether the WEBGL_compressed_texture_astc extension is enabled.
     @prop {boolean} pvrtcTexturesEnabled Whether the WEBGL_compressed_texture_pvrtc extension is enabled.
     @prop {Object} state Tracked GL state.
-    @prop {GLEnum} clearBits Current clear mask to use with clear().    
+    @prop {GLEnum} clearBits Current clear mask to use with clear().
 */
 class App {
-    
+
     constructor(canvas, contextAttributes) {
         this.canvas = canvas;
         this.gl = canvas.getContext("webgl2", contextAttributes);
@@ -1682,7 +1682,7 @@ class App {
 
 
     /**
-        Enable the WEBGL_compressed_texture_s3tc and WEBGL_compressed_texture_s3tc_srgb extensions, which 
+        Enable the WEBGL_compressed_texture_s3tc and WEBGL_compressed_texture_s3tc_srgb extensions, which
         allow the following enums to be used as texture formats:
 
         <ul>
@@ -1702,7 +1702,7 @@ class App {
     s3tcTextures() {
         let ext = this.gl.getExtension("WEBGL_compressed_texture_s3tc");
         this.s3tcTexturesEnabled = !!ext;
-        
+
         if (this.s3tcTexturesEnabled) {
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_RGB_S3TC_DXT1_EXT]  = true;
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_RGBA_S3TC_DXT1_EXT] = true;
@@ -1712,7 +1712,7 @@ class App {
 
         ext = this.gl.getExtension("WEBGL_compressed_texture_s3tc_srgb");
         this.s3tcSRGBTexturesEnabled = !!ext;
-        
+
         if (this.s3tcSRGBTexturesEnabled) {
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_SRGB_S3TC_DXT1_EXT]       = true;
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT] = true;
@@ -1726,7 +1726,7 @@ class App {
     /**
         Enable the WEBGL_compressed_texture_etc extension, which allows the following enums to
         be used as texture formats:
-        
+
         <ul>
           <li>PicoGL.COMPRESSED_R11_EAC
           <li>PicoGL.COMPRESSED_SIGNED_R11_EAC
@@ -1769,7 +1769,7 @@ class App {
     /**
         Enable the WEBGL_compressed_texture_astc extension, which allows the following enums to
         be used as texture formats:
-        
+
         <ul>
           <li>PicoGL.COMPRESSED_RGBA_ASTC_4x4_KHR
           <li>PicoGL.COMPRESSED_RGBA_ASTC_5x4_KHR
@@ -1838,7 +1838,7 @@ class App {
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR] = true;
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR] = true;
         }
-        
+
         return this;
     }
 
@@ -1859,7 +1859,7 @@ class App {
     pvrtcTextures() {
         let ext = this.gl.getExtension("WEBGL_compressed_texture_pvrtc");
         this.pvrtcTexturesEnabled = !!ext;
-        
+
         if (this.pvrtcTexturesEnabled) {
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_RGB_PVRTC_4BPPV1_IMG] = true;
             TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[CONSTANTS.COMPRESSED_RGB_PVRTC_2BPPV1_IMG] = true;
@@ -1885,9 +1885,9 @@ class App {
     readPixel(x, y, outColor, options = CONSTANTS.DUMMY_OBJECT) {
         let {
             format = CONSTANTS.RGBA,
-            type = CONSTANTS.UNSIGNED_BYTE    
+            type = CONSTANTS.UNSIGNED_BYTE
         } = options;
-        
+
         this.gl.readPixels(x, y, 1, 1, format, type, outColor);
 
         return this;
@@ -2061,18 +2061,18 @@ class App {
         </ul>
 
         @method
-        @param {DOMElement|ArrayBufferView|Array} [image] Image data. An array can be passed to manually set all levels 
+        @param {DOMElement|ArrayBufferView|Array} [image] Image data. An array can be passed to manually set all levels
             of the mipmap chain. If a single level is passed and mipmap filtering is being used,
             generateMipmap() will be called to produce the remaining levels.
         @param {number} [width] Texture width. Required for array or empty data.
         @param {number} [height] Texture height. Required for array or empty data.
         @param {Object} [options] Texture options.
-        @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT 
+        @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT
             if format is DEPTH_COMPONENT, UNSIGNED_BYTE otherwise.
         @param {GLEnum} [options.format=RGBA] Texture data format.
         @param {GLEnum} [options.internalFormat=RGBA] Texture data internal format.
-        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture. 
-        @param {GLEnum} [options.minFilter] Minification filter. Defaults to 
+        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture.
+        @param {GLEnum} [options.minFilter] Minification filter. Defaults to
             LINEAR_MIPMAP_NEAREST if image data is provided, NEAREST otherwise.
         @param {GLEnum} [options.magFilter] Magnification filter. Defaults to LINEAR
             if image data is provided, NEAREST otherwise.
@@ -2094,7 +2094,7 @@ class App {
             options = height;
             height = width;
             width = image;
-            image = null;    
+            image = null;
         } else if (height === undefined) {
             // Passing in a DOM element. Height/width not required.
             options = width;
@@ -2109,19 +2109,19 @@ class App {
         Create a 2D texture array.
 
         @method
-        @param {ArrayBufferView|Array} image Pixel data. An array can be passed to manually set all levels 
+        @param {ArrayBufferView|Array} image Pixel data. An array can be passed to manually set all levels
             of the mipmap chain. If a single level is passed and mipmap filtering is being used,
             generateMipmap() will be called to produce the remaining levels.
         @param {number} width Texture width.
         @param {number} height Texture height.
         @param {number} size Number of images in the array.
         @param {Object} [options] Texture options.
-         @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT 
+         @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT
             if format is DEPTH_COMPONENT, UNSIGNED_BYTE otherwise.
         @param {GLEnum} [options.format=RGBA] Texture data format.
         @param {GLEnum} [options.internalFormat=RGBA] Texture data internal format.
-        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture. 
-        @param {GLEnum} [options.minFilter] Minification filter. Defaults to 
+        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture.
+        @param {GLEnum} [options.minFilter] Minification filter. Defaults to
             LINEAR_MIPMAP_NEAREST if image data is provided, NEAREST otherwise.
         @param {GLEnum} [options.magFilter] Magnification filter. Defaults to LINEAR
             if image data is provided, NEAREST otherwise.
@@ -2145,7 +2145,7 @@ class App {
             depth = height;
             height = width;
             width = image;
-            image = null;    
+            image = null;
         }
         return new Texture(this.gl, this.state, this.gl.TEXTURE_2D_ARRAY, image, width, height, depth, true, options);
     }
@@ -2154,19 +2154,19 @@ class App {
         Create a 3D texture.
 
         @method
-        @param {ArrayBufferView|Array} image Pixel data. An array can be passed to manually set all levels 
+        @param {ArrayBufferView|Array} image Pixel data. An array can be passed to manually set all levels
             of the mipmap chain. If a single level is passed and mipmap filtering is being used,
             generateMipmap() will be called to produce the remaining levels.
         @param {number} width Texture width.
         @param {number} height Texture height.
         @param {number} depth Texture depth.
         @param {Object} [options] Texture options.
-        @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT 
+        @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT
             if format is DEPTH_COMPONENT, UNSIGNED_BYTE otherwise.
         @param {GLEnum} [options.format=RGBA] Texture data format.
         @param {GLEnum} [options.internalFormat=RGBA] Texture data internal format.
-        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture. 
-        @param {GLEnum} [options.minFilter] Minification filter. Defaults to 
+        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture.
+        @param {GLEnum} [options.minFilter] Minification filter. Defaults to
             LINEAR_MIPMAP_NEAREST if image data is provided, NEAREST otherwise.
         @param {GLEnum} [options.magFilter] Magnification filter. Defaults to LINEAR
             if image data is provided, NEAREST otherwise.
@@ -2190,7 +2190,7 @@ class App {
             depth = height;
             height = width;
             width = image;
-            image = null;    
+            image = null;
         }
         return new Texture(this.gl, this.state, this.gl.TEXTURE_3D, image, width, height, depth, true, options);
     }
@@ -2212,12 +2212,12 @@ class App {
                 Can be any format that would be accepted by texImage2D.
         @param {DOMElement|ArrayBufferView} [options.posZ] The image data for the positive Z direction.
                 Can be any format that would be accepted by texImage2D.
-        @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT 
+        @param {GLEnum} [options.type] Type of data stored in the texture. Defaults to UNSIGNED_SHORT
             if format is DEPTH_COMPONENT, UNSIGNED_BYTE otherwise.
         @param {GLEnum} [options.format=RGBA] Texture data format.
         @param {GLEnum} [options.internalFormat=RGBA] Texture data internal format.
-        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture. 
-        @param {GLEnum} [options.minFilter] Minification filter. Defaults to 
+        @param {boolean} [options.flipY=false] Whether the y-axis should be flipped when unpacking the texture.
+        @param {GLEnum} [options.minFilter] Minification filter. Defaults to
             LINEAR_MIPMAP_NEAREST if image data is provided, NEAREST otherwise.
         @param {GLEnum} [options.magFilter] Magnification filter. Defaults to LINEAR
             if image data is provided, NEAREST otherwise.
@@ -2346,7 +2346,7 @@ class Cubemap {
         this.type = options.type !== undefined ? options.type : defaultType;
         this.internalFormat = options.internalFormat !== undefined ? options.internalFormat : TEXTURE_FORMAT_DEFAULTS[this.type][this.format];
         this.appState = appState;
-        
+
         // -1 indicates unbound
         this.currentUnit = -1;
 
@@ -2362,7 +2362,7 @@ class Cubemap {
             compareFunc = gl.LEQUAL,
             generateMipmaps = minFilter === gl.LINEAR_MIPMAP_NEAREST || minFilter === gl.LINEAR_MIPMAP_LINEAR
         } = options;
-        
+
         this.bind(0);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, magFilter);
@@ -2386,7 +2386,7 @@ class Cubemap {
 
         let levels = generateMipmaps ? Math.floor(Math.log2(Math.min(width, height))) + 1 : 1;
         gl.texStorage2D(gl.TEXTURE_CUBE_MAP, levels, this.internalFormat, width, height);
-
+/*
         if (negX) {
             gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, 0, 0, width, height, this.format, this.type, negX);
             gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0, 0, width, height, this.format, this.type, posX);
@@ -2399,7 +2399,7 @@ class Cubemap {
         if (generateMipmaps) {
             gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
         }
-
+*/
     }
 
     /**
@@ -2428,7 +2428,7 @@ class Cubemap {
     */
     bind(unit) {
         let currentTexture = this.appState.textures[unit];
-        
+
         if (currentTexture !== this) {
             if (currentTexture) {
                 currentTexture.currentUnit = -1;
@@ -3122,7 +3122,7 @@ class Program {
         for (i = 0; i < numUniformBlocks; ++i) {
             let blockName = gl.getActiveUniformBlockName(this.program, i);
             let blockIndex = gl.getUniformBlockIndex(this.program, blockName);
-            
+
             let uniformBlockBase = this.uniformBlockCount++;
             this.gl.uniformBlockBinding(this.program, blockIndex, uniformBlockBase);
             this.uniformBlocks[blockName] = uniformBlockBase;
@@ -3145,7 +3145,7 @@ class Program {
 
         return this;
     }
-    
+
     /**
         Set the value of a uniform.
 
@@ -3159,7 +3159,7 @@ class Program {
         return this;
     }
 
-    // 
+    //
     /**
         Use this program.
 
@@ -3329,7 +3329,7 @@ UNIFORM_CACHE_CLASS[CONSTANTS.UNSIGNED_INT_VEC3] = Uint32Array;
 UNIFORM_CACHE_CLASS[CONSTANTS.UNSIGNED_INT_VEC4] = Uint32Array;
 
 class SingleComponentUniform {
-    
+
     constructor(gl, handle, type) {
         this.gl = gl;
         this.handle = handle;
@@ -3469,7 +3469,7 @@ const DUMMY_ARRAY = new Array(1);
     @prop {number} currentUnit The current texture unit this texture is bound to.
     @prop {boolean} is3D Whether this texture contains 3D data.
     @prop {boolean} flipY Whether the y-axis is being flipped for this texture.
-    @prop {boolean} mipmaps Whether this texture is using mipmap filtering 
+    @prop {boolean} mipmaps Whether this texture is using mipmap filtering
         (and thus should have a complete mipmap chain).
     @prop {Object} appState Tracked GL state.
 */
@@ -3490,7 +3490,7 @@ class Texture {
         this.format = null;
         this.internalFormat = null;
         this.compressed = !!(TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[options.format] || TEXTURE_FORMAT_DEFAULTS.COMPRESSED_TYPES[options.internalFormat]);
-        
+
         if (this.compressed) {
             // For compressed textures, just need to provide one of format, internalFormat.
             // The other will be the same.
@@ -3554,7 +3554,7 @@ class Texture {
         depth = depth || 0;
 
         if (width === this.width && height === this.height && depth === this.depth) {
-            return this; 
+            return this;
         }
 
         this.gl.deleteTexture(this.texture);
@@ -3612,13 +3612,13 @@ class Texture {
     }
 
     /**
-        Set the image data for the texture. An array can be passed to manually set all levels 
+        Set the image data for the texture. An array can be passed to manually set all levels
         of the mipmap chain. If a single level is passed and mipmap filtering is being used,
         generateMipmap() will be called to produce the remaining levels.
         NOTE: the data must fit the currently-allocated storage!
 
         @method
-        @param {ImageElement|ArrayBufferView|Array} data Image data. If an array is passed, it will be 
+        @param {ImageElement|ArrayBufferView|Array} data Image data. If an array is passed, it will be
             used to set mip map levels.
         @return {Texture} The Texture object.
     */
@@ -3703,7 +3703,7 @@ class Texture {
     */
     bind(unit) {
         let currentTexture = this.appState.textures[unit];
-        
+
         if (currentTexture !== this) {
             if (currentTexture) {
                 currentTexture.currentUnit = -1;
@@ -4161,7 +4161,7 @@ class UniformBuffer {
         this.dataViews[CONSTANTS.INT] = new Int32Array(this.data.buffer);
         this.dataViews[CONSTANTS.UNSIGNED_INT] = new Uint32Array(this.data.buffer);
 
-        
+
         this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.buffer);
         this.gl.bufferData(this.gl.UNIFORM_BUFFER, this.size * 4, this.usage);
         this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
@@ -4255,7 +4255,7 @@ class UniformBuffer {
             }
 
             this.gl.bindBufferBase(this.gl.UNIFORM_BUFFER, base, this.buffer);
-            
+
             this.appState.uniformBuffers[base] = this;
             this.currentBase = base;
         }
@@ -4311,7 +4311,7 @@ const CONSTANTS = __webpack_require__(0);
     @prop {Object} appState Tracked GL state.
 */
 class VertexArray {
-    
+
     constructor(gl, appState) {
         this.gl = gl;
         this.vertexArray = gl.createVertexArray();
@@ -4403,7 +4403,7 @@ class VertexArray {
         Bind an per-instance normalized attribute buffer to this vertex array.
         Integer data in the vertex buffer will be normalized to [-1.0, 1.0] if
         signed, [0.0, 1.0] if unsigned.
-        
+
         @method
         @param {number} attributeIndex The attribute location to bind to.
         @param {VertexBuffer} vertexBuffer The VertexBuffer to bind.
