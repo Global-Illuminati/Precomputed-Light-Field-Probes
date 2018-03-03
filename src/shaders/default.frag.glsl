@@ -12,6 +12,7 @@ in vec3 v_normal;
 in vec3 v_tangent;
 in vec3 v_bitangent;
 in vec2 v_tex_coord;
+in vec3 v_world_space_normal;
 in vec4 v_light_space_position;
 
 #include <scene_uniforms.glsl>
@@ -41,7 +42,7 @@ void main()
 
 	// Rotate normal map normals from tangent space to view space (normal mapping)
 	vec3 mapped_normal = texture(u_normal_map, v_tex_coord).xyz;
-	mapped_normal = normalize(mapped_normal * vec3(2.0) - vec3(1.0));
+	mapped_normal = unpackNormal(mapped_normal);
 	N = tbn * mapped_normal;
 
 	vec3 diffuse = texture(u_diffuse_map, v_tex_coord).rgb;
@@ -82,6 +83,6 @@ void main()
 	}
 
 	o_color = vec4(color, 1.0);
-	o_normal = vec4(N * vec3(0.5) + vec3(0.5), 1.0);
+	o_normal = vec4(packNormal(v_world_space_normal), 1.0);
 
 }

@@ -25,6 +25,7 @@ var defaultShader;
 var shadowMapShader;
 
 var blitTextureDrawCall;
+var blitCubemapDrawCall
 var environmentDrawCall;
 
 var sceneUniforms;
@@ -40,6 +41,10 @@ var probeDrawCall;
 var probeLocations = [
 	-10, 4,  0,
 ]
+
+var probeRenderingFramebuffer;
+var probeCubemaps = {};
+var probeCubeSize;
 
 window.addEventListener('DOMContentLoaded', function () {
 
@@ -195,6 +200,7 @@ function init() {
 	shaderLoader.addShaderProgram('default', 'default.vert.glsl', 'default.frag.glsl');
 	shaderLoader.addShaderProgram('environment', 'environment.vert.glsl', 'environment.frag.glsl');
 	shaderLoader.addShaderProgram('textureBlit', 'screen_space.vert.glsl', 'texture_blit.frag.glsl');
+	shaderLoader.addShaderProgram('cubemapBlit', 'screen_space.vert.glsl', 'cubemap_blit.frag.glsl');
 	shaderLoader.addShaderProgram('shadowMapping', 'shadow_mapping.vert.glsl', 'shadow_mapping.frag.glsl');
 	shaderLoader.load(function(data) {
 
@@ -202,6 +208,8 @@ function init() {
 
 		var textureBlitShader = makeShader('textureBlit', data);
 		blitTextureDrawCall = app.createDrawCall(textureBlitShader, fullscreenVertexArray);
+		var cubemapBlitShader = makeShader('cubemapBlit', data);
+		blitCubemapDrawCall = app.createDrawCall(cubemapBlitShader, fullscreenVertexArray);
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
@@ -215,91 +223,7 @@ function init() {
 		shadowMapShader = makeShader('shadowMapping', data);
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 
-		var radianceCubeMap = app.createCubemap({
-			width: 1024,
-			height: 1024
-		});
-
-		var depthCubeMap = app.createCubemap({
-			width: 1024,
-			height: 1024,
-			format: PicoGL.DEPTH_COMPONENT
-		});
-
-		var normalCubeMap = app.createCubemap({
-			width: 1024,
-			height: 1024
-		});
-
-		var frameBuffer = app.createFramebuffer();
-
-		var projectionMatrix = mat4.create();
-		mat4.perspective(projectionMatrix, Math.PI/2, 1, 0.1, 1000)
-
-		var cameraPosition = new Float32Array(probeLocations);
-
-		var ENV_CUBE_LOOK_DIR = [
-		 	vec3.fromValues(1.0, 0.0, 0.0),
-		  vec3.fromValues(-1.0, 0.0, 0.0),
-		  vec3.fromValues(0.0, 1.0, 0.0),
-		 	vec3.fromValues(0.0, -1.0, 0.0),
-	   	vec3.fromValues(0.0, 0.0, 1.0),
-	 		vec3.fromValues(0.0, 0.0, -1.0)
-		];
-
-		var ENV_CUBE_LOOK_UP = [
-			vec3.fromValues(0.0, -1.0, 0.0),
-			vec3.fromValues(0.0, -1.0, 0.0),
-		 	vec3.fromValues(0.0, 0.0, 1.0),
-		 	vec3.fromValues(0.0, 0.0, -1.0),
-	  	vec3.fromValues(0.0, -1.0, 0.0),
-	  	vec3.fromValues(0.0, -1.0, 0.0)
-		];
-
-		for (var side = 0; side < 6; side++) {
-			var viewMatrix = mat4.create();
-			var lookPos = vec3.add(vec3.create(), ENV_CUBE_LOOK_DIR[side], cameraPosition);
-			mat4.lookAt(viewMatrix, cameraPosition, lookPos, ENV_CUBE_LOOK_UP[side]);
-
-			frameBuffer.colorTarget(0, radianceCubeMap, PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X+side)
-			frameBuffer.colorTarget(1, normalCubeMap, PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X+side)
-			frameBuffer.depthTarget(depthCubeMap, PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X+side)
-
-
-
-			var matrix3 = mat3.create();
-			mat3.fromMat4(matrix3, viewMatrix);
-			var quaternion = quat.create();
-			quat.fromMat3(quaternion, matrix3);
-			var cam = {orientation: quaternion};
-
-			var dirLightViewDirection = directionalLight.viewSpaceDirection(cam);
-			var lightViewProjection = directionalLight.getLightViewProjectionMatrix();
-			var shadowMap = shadowMapFramebuffer.depthTexture;
-
-			app.drawFramebuffer(frameBuffer)
-			.viewport(0, 0, 1024, 1024)
-			.depthTest()
-			.depthFunc(PicoGL.LEQUAL)
-			.noBlend()
-			.clear();
-
-			for (var i = 0, len = meshes.length; i < len; ++i) {
-
-				var mesh = meshes[i];
-
-				mesh.drawCall
-				.uniform('u_world_from_local', mesh.modelMatrix)
-				.uniform('u_view_from_world', viewMatrix)
-				.uniform('u_projection_from_view', projectionMatrix)
-				.uniform('u_dir_light_color', directionalLight.color)
-				.uniform('u_dir_light_view_direction', dirLightViewDirection)
-				.uniform('u_light_projection_from_world', lightViewProjection)
-				.texture('u_shadow_map', shadowMap)
-				.draw();
-
-			}
-		}
+		setupProbeCubemaps(1024);
 
 	});
 
@@ -465,6 +389,29 @@ function setupProbeDrawCall(vertexArray, shader) {
 
 }
 
+function setupProbeCubemaps(size) {
+
+	probeCubemaps['radiance'] = app.createCubemap({
+		width: size,
+		height: size
+	});
+
+	probeCubemaps['depth'] = app.createCubemap({
+		width: size,
+		height: size,
+		format: PicoGL.DEPTH_COMPONENT
+	});
+
+	probeCubemaps['normals'] = app.createCubemap({
+		width: size,
+		height: size
+	});
+
+	probeCubeSize = size;
+	probeRenderingFramebuffer = app.createFramebuffer();
+
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 function resize() {
@@ -492,10 +439,16 @@ function render() {
 		renderScene();
 
 		var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
-		renderProbes(viewProjection);
+		renderProbeLocations(viewProjection);
 
 		var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
 		renderEnvironment(inverseViewProjection)
+
+		// Render the probes
+		//renderProbeCubemaps();
+
+		// Render the probe maps
+		//renderCubemapToScreen(probeCubemaps['radiance']);
 
 		// Call this to get a debug render of the passed in texture
 		//renderTextureToScreen(shadowMap);
@@ -596,7 +549,7 @@ function renderScene() {
 
 }
 
-function renderProbes(viewProjection) {
+function renderProbeLocations(viewProjection) {
 
 	if (probeDrawCall) {
 
@@ -634,6 +587,103 @@ function renderEnvironment(inverseViewProjection) {
 
 }
 
+function renderProbeCubemaps() {
+
+	if (!probeRenderingFramebuffer) {
+		return;
+	}
+
+	var projectionMatrix = mat4.create();
+	mat4.perspective(projectionMatrix, Math.PI / 2.0, 1.0, 0.1, 100.0);
+
+	// TODO: Make this support multiple probes!
+	var cameraPosition = new Float32Array(probeLocations);
+
+	var CUBE_LOOK_DIR = [
+		vec3.fromValues(1.0, 0.0, 0.0),
+		vec3.fromValues(-1.0, 0.0, 0.0),
+		vec3.fromValues(0.0, 1.0, 0.0),
+		vec3.fromValues(0.0, -1.0, 0.0),
+		vec3.fromValues(0.0, 0.0, 1.0),
+		vec3.fromValues(0.0, 0.0, -1.0)
+	];
+
+	var CUBE_LOOK_UP = [
+		vec3.fromValues(0.0, -1.0, 0.0),
+		vec3.fromValues(0.0, -1.0, 0.0),
+		vec3.fromValues(0.0, 0.0, 1.0),
+		vec3.fromValues(0.0, 0.0, -1.0),
+		vec3.fromValues(0.0, -1.0, 0.0),
+		vec3.fromValues(0.0, -1.0, 0.0)
+	];
+
+	for (var side = 0; side < 6; side++) {
+
+		var viewMatrix = mat4.create();
+		var lookPos = vec3.add(vec3.create(), cameraPosition, CUBE_LOOK_DIR[side]);
+		mat4.lookAt(viewMatrix, cameraPosition, lookPos, CUBE_LOOK_UP[side]);
+
+		var sideTarget = PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X + side;
+		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance'], sideTarget);
+		probeRenderingFramebuffer.colorTarget(1, probeCubemaps['normals'], sideTarget);
+		probeRenderingFramebuffer.depthTarget(probeCubemaps['depth'], sideTarget);
+
+		// TODO: Fix this shit
+		// Create mock camera to be able to get the view space light direction. Probably clean this up some day...
+		var matrix3 = mat3.create();
+		mat3.fromMat4(matrix3, viewMatrix);
+		var quaternion = quat.create();
+		quat.fromMat3(quaternion, matrix3);
+		quat.conjugate(quaternion, quaternion); // (since the lookat already accounts for the inverse)
+		quat.normalize(quaternion, quaternion);
+		var cam = { orientation: quaternion };
+
+		var dirLightViewDirection = directionalLight.viewSpaceDirection(cam);
+		var lightViewProjection = directionalLight.getLightViewProjectionMatrix();
+		var shadowMap = shadowMapFramebuffer.depthTexture;
+
+		app.drawFramebuffer(probeRenderingFramebuffer)
+		.viewport(0, 0, probeCubeSize, probeCubeSize)
+		.depthTest()
+		.depthFunc(PicoGL.LEQUAL)
+		.noBlend()
+		.clear();
+
+		for (var i = 0, len = meshes.length; i < len; ++i) {
+
+			var mesh = meshes[i];
+
+			mesh.drawCall
+			.uniform('u_world_from_local', mesh.modelMatrix)
+			.uniform('u_view_from_world', viewMatrix)
+			.uniform('u_projection_from_view', projectionMatrix)
+			.uniform('u_dir_light_color', directionalLight.color)
+			.uniform('u_dir_light_view_direction', dirLightViewDirection)
+			.uniform('u_light_projection_from_world', lightViewProjection)
+			.texture('u_shadow_map', shadowMap)
+			.draw();
+
+		}
+
+		var inverseViewProjection = mat4.create();
+		mat4.mul(inverseViewProjection, projectionMatrix, viewMatrix);
+		mat4.invert(inverseViewProjection, inverseViewProjection);
+
+		if (environmentDrawCall) {
+
+			app.depthFunc(PicoGL.EQUAL);
+
+			environmentDrawCall
+			.uniform('u_camera_position', camera.position)
+			.uniform('u_world_from_projection', inverseViewProjection)
+			.uniform('u_environment_brightness', settings.environment_brightness)
+			.draw();
+
+		}
+	}
+
+}
+
 function renderTextureToScreen(texture) {
 
 	//
@@ -655,6 +705,23 @@ function renderTextureToScreen(texture) {
 
 	blitTextureDrawCall
 	.texture('u_texture', texture)
+	.draw();
+
+}
+
+function renderCubemapToScreen(cubemap) {
+
+	if (!blitCubemapDrawCall) {
+		return;
+	}
+
+	app.defaultDrawFramebuffer()
+	.defaultViewport()
+	.noDepthTest()
+	.noBlend();
+
+	blitCubemapDrawCall
+	.texture('u_cubemap', cubemap)
 	.draw();
 
 }
