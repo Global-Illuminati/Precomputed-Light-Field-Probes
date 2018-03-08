@@ -42,6 +42,15 @@ var probeLocations = [
 	-10, 4,  0,
 ]
 
+var octahedralFramebuffer;
+var probeOctahedralSize;
+var probeOctahedrals = {
+	radianceHigh: null,
+	radianceLow: null,
+	distance: null,
+	normals: null
+};
+
 var probeRenderingFramebuffer;
 var probeCubemaps = {};
 var probeCubeSize;
@@ -223,7 +232,7 @@ function init() {
 		shadowMapShader = makeShader('shadowMapping', data);
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 
-		setupProbeCubemaps(1024);
+		setupProbes(1024, 1024);
 
 	});
 
@@ -389,26 +398,60 @@ function setupProbeDrawCall(vertexArray, shader) {
 
 }
 
-function setupProbeCubemaps(size) {
+function setupProbes(cubemapSize, octahedralSize) {
+
+	// Cubemap stuff
+
+	probeRenderingFramebuffer = app.createFramebuffer();
+	probeCubeSize = cubemapSize;
 
 	probeCubemaps['radiance'] = app.createCubemap({
-		width: size,
-		height: size
+		width: cubemapSize,
+		height: cubemapSize
 	});
 
 	probeCubemaps['depth'] = app.createCubemap({
-		width: size,
-		height: size,
+		width: cubemapSize,
+		height: cubemapSize,
 		format: PicoGL.DEPTH_COMPONENT
 	});
 
 	probeCubemaps['normals'] = app.createCubemap({
-		width: size,
-		height: size
+		width: cubemapSize,
+		height: cubemapSize
 	});
 
-	probeCubeSize = size;
-	probeRenderingFramebuffer = app.createFramebuffer();
+	// Octahedral stuff
+
+	octahedralFramebuffer = app.createFramebuffer();
+	probeOctahedralSize = octahedralSize;
+
+	probeOctahedrals['radiance'] = app.createTexture2D(octahedralSize, octahedralSize, {
+		type: PicoGL.FLOAT,
+		format: PicoGL.RGB,
+		internalFormat: PicoGL.R11F_G11F_B10F
+	});
+
+	// TODO: Probably encode normals as RG8 instead to compress it a bit (like in the paper). We don't need much precision anyway...
+	probeOctahedrals['normals'] = app.createTexture2D(octahedralSize, octahedralSize, {
+		type: PicoGL.UNSIGNED_BYTE,
+		format: PicoGL.RGB,
+		internalFormat: PicoGL.RGB8
+	});
+
+	probeOctahedrals['distanceHigh'] = app.createTexture2D(octahedralSize, octahedralSize, {
+		type: PicoGL.FLOAT,
+		format: PicoGL.RED,
+		internalFormat: PicoGL.R16F
+	});
+
+	var lowPrecisionSizeDownsample = 16;
+	var lowSize = octahedralSize / lowPrecisionSizeDownsample;
+	probeOctahedrals['distanceLow'] = app.createTexture2D(lowSize, lowSize, {
+		type: PicoGL.FLOAT,
+		format: PicoGL.RED,
+		internalFormat: PicoGL.R16F
+	});
 
 }
 
@@ -445,7 +488,8 @@ function render() {
 		renderEnvironment(inverseViewProjection)
 
 		// Render the probes
-		//renderProbeCubemaps();
+		renderProbeCubemaps();
+		octahedralProjectProbeCubemaps();
 
 		// Render the probe maps
 		//renderCubemapToScreen(probeCubemaps['radiance']);
@@ -681,6 +725,14 @@ function renderProbeCubemaps() {
 
 		}
 	}
+
+}
+
+function octahedralProjectProbeCubemaps() {
+
+	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 
 }
 
