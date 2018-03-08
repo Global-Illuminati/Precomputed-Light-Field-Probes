@@ -42,6 +42,7 @@ var probeLocations = [
 	-10, 4,  0,
 ]
 
+var octahedralDrawCall;
 var octahedralFramebuffer;
 var probeOctahedralSize;
 var probeOctahedrals = {
@@ -167,6 +168,7 @@ function init() {
 
 	var canvas = document.getElementById('canvas');
 	app = PicoGL.createApp(canvas, { antialias: true });
+	app.floatRenderTargets();
 
 	stats = new Stats();
 	stats.showPanel(1); // (frame time)
@@ -223,7 +225,7 @@ function init() {
 		blitCubemapDrawCall = app.createDrawCall(cubemapBlitShader, fullscreenVertexArray);
 
 		var octahedralShader = makeShader('octahedralMap', data);
-
+		octahedralDrawCall = app.createDrawCall(octahedralShader, fullscreenVertexArray);
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
@@ -500,7 +502,7 @@ function render() {
 		//renderCubemapToScreen(probeCubemaps['radiance']);
 
 		// Call this to get a debug render of the passed in texture
-		//renderTextureToScreen(shadowMap);
+		renderTextureToScreen(probeOctahedrals['distanceHigh']);
 
 	}
 	picoTimer.end();
@@ -734,11 +736,25 @@ function renderProbeCubemaps() {
 }
 
 function octahedralProjectProbeCubemaps() {
+	if(!octahedralDrawCall) {
+		return;
+	}
 
-	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+	octahedralFramebuffer.colorTarget(0, probeOctahedrals['radiance']);
+	octahedralFramebuffer.colorTarget(1, probeOctahedrals['distanceHigh']);
+	//octahedralFramebuffer.colorTarget(2, probeOctahedrals['distanceLow']);
+	octahedralFramebuffer.colorTarget(3, probeOctahedrals['normals']);
 
+	app.drawFramebuffer(octahedralFramebuffer)
+	.viewport(0, 0, probeOctahedralSize, probeOctahedralSize)
+	.noDepthTest()
+	.noBlend();
+
+	octahedralDrawCall
+	.texture('u_radianceCubemap', probeCubemaps['radiance'])
+	.texture('u_depthHighCubemap', probeCubemaps['depth'])
+	.texture('u_normalsCubemap', probeCubemaps['normals'])
+	.draw();
 }
 
 function renderTextureToScreen(texture) {
