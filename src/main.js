@@ -45,9 +45,9 @@ var probeLocations = [
 var octahedralFramebuffer;
 var probeOctahedralSize;
 var probeOctahedrals = {
-	radianceHigh: null,
-	radianceLow: null,
-	distance: null,
+	radiance: null,
+	distanceLow: null,
+	distanceHigh: null,
 	normals: null
 };
 
@@ -205,12 +205,14 @@ function init() {
 	shaderLoader.addShaderFile('common.glsl');
 	shaderLoader.addShaderFile('scene_uniforms.glsl');
 	shaderLoader.addShaderFile('mesh_attributes.glsl');
+	shaderLoader.addShaderFile('octahedral.glsl')
 	shaderLoader.addShaderProgram('unlit', 'unlit.vert.glsl', 'unlit.frag.glsl');
 	shaderLoader.addShaderProgram('default', 'default.vert.glsl', 'default.frag.glsl');
 	shaderLoader.addShaderProgram('environment', 'environment.vert.glsl', 'environment.frag.glsl');
 	shaderLoader.addShaderProgram('textureBlit', 'screen_space.vert.glsl', 'texture_blit.frag.glsl');
 	shaderLoader.addShaderProgram('cubemapBlit', 'screen_space.vert.glsl', 'cubemap_blit.frag.glsl');
 	shaderLoader.addShaderProgram('shadowMapping', 'shadow_mapping.vert.glsl', 'shadow_mapping.frag.glsl');
+	shaderLoader.addShaderProgram('octahedralMap', 'screen_space.vert.glsl', 'octahedral.frag.glsl');
 	shaderLoader.load(function(data) {
 
 		var fullscreenVertexArray = createFullscreenVertexArray();
@@ -219,6 +221,9 @@ function init() {
 		blitTextureDrawCall = app.createDrawCall(textureBlitShader, fullscreenVertexArray);
 		var cubemapBlitShader = makeShader('cubemapBlit', data);
 		blitCubemapDrawCall = app.createDrawCall(cubemapBlitShader, fullscreenVertexArray);
+
+		var octahedralShader = makeShader('octahedralMap', data);
+
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
