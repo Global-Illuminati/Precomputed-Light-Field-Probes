@@ -82,7 +82,10 @@ void main()
 		color += visibility * shininess * specular * u_dir_light_color;
 	}
 
-	o_color = vec4(color, 1.0);
+	// For the cubemaps we want the distance from the camera to the fragments
+	float distance_to_fragment = length(v_position);
+
+	o_color = vec4(color, distance_to_fragment);
 	o_normal = vec4(packNormal(v_world_space_normal), 1.0);
 
 }

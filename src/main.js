@@ -433,7 +433,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 	// we get an optimal transfer to the octahedrals. Can definitely be optimized!
 	//
 
-	probeCubemaps['radiance'] = app.createCubemap({
+	probeCubemaps['radiance_distance'] = app.createCubemap({
 		width: cubemapSize,
 		height: cubemapSize,
 		type: PicoGL.FLOAT,
@@ -725,7 +725,7 @@ function renderProbeCubemaps() {
 		mat4.lookAt(viewMatrix, cameraPosition, lookPos, CUBE_LOOK_UP[side]);
 
 		var sideTarget = PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X + side;
-		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance'], sideTarget);
+		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance_distance'], sideTarget);
 		probeRenderingFramebuffer.colorTarget(1, probeCubemaps['normals'], sideTarget);
 		probeRenderingFramebuffer.depthTarget(probeCubemaps['depth'], sideTarget);
 
@@ -800,9 +800,8 @@ function octahedralProjectProbeCubemaps() {
 	app.noDepthTest().noBlend();
 
 	octahedralDrawCall
-	.texture('u_radianceCubemap', probeCubemaps['radiance'])
-	.texture('u_depthCubemap', probeCubemaps['depth'])
-	.texture('u_normalsCubemap', probeCubemaps['normals']);
+	.texture('u_radiance_distance_cubemap', probeCubemaps['radiance_distance'])
+	.texture('u_normals_cubemap', probeCubemaps['normals']);
 
 	app.drawFramebuffer(octahedralFramebuffer)
 	.viewport(0, 0, probeOctahedralSize, probeOctahedralSize);
