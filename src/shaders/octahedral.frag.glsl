@@ -20,8 +20,7 @@ void main()
 	vec4 radiance_distance = texture(u_radiance_distance_cubemap, direction);
 	o_radiance = vec4(radiance_distance.rgb, 1.0);
 
-	// TODO: Remove this scaling!!! Also, think about if we want the no-hit-clear-distance to be 0 or 1!
-	//radiance_distance.a = radiance_distance.a / (radiance_distance.a + 1.0);
+	// TODO: Do we want the no-hit-clear-distance to be 0 or 1!
 	o_distance = vec4(vec3(radiance_distance.a), 1.0);
 
 	o_normals = texture(u_normals_cubemap, direction);

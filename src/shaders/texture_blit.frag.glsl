@@ -13,6 +13,13 @@ void main()
 	o_color = texture(u_texture, v_tex_coord);
 
 	if (u_is_depth_map) {
-		o_color.rgb = vec3(pow(o_color.r, 25.0));
+
+		// Well, not really a depth map but a linear distance map
+		float val = o_color.r;
+		float remapped = val / (val + 1.0);
+		o_color.rgb = vec3(pow(remapped, 25.0));
+
+		// Actually a depth map:
+		//o_color.rgb = vec3(pow(o_color.r, 25.0));
 	}
 }
