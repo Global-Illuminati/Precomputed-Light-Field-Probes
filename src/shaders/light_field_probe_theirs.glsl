@@ -14,56 +14,6 @@
 #include <common.glsl>
 #include <octahedral.glsl>
 
-///////////////////////////////////////////////////////////
-// Compability definitions
-
-struct Ray
-{
-	vec3 origin;
-	vec3 direction;
-};
-
-Ray makeRay(in vec3 origin, in vec3 direction)
-{
-	Ray ray;
-	ray.origin = origin;
-	ray.direction = normalize(direction);
-	return ray;
-}
-
-#define Point2  vec2
-#define Point3  vec3
-
-#define Vector2 vec2
-#define Vector3 vec3
-
-// NOTE: We need this to be 32 bits to be able to findMSB
-//precision highp ivec3;
-#define Vector3int32 highp ivec3
-
-// Not defined until GLSL 400
-// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/findMSB.xhtml
-int findMSB(highp int val)
-{
-	if (val == 0 || val == -1) return -1;
-
-	// For negative integers, set the sign bit to zero so we can use the same method for all numbers and not always get
-	// bit 32 as the MSB for all negative numbers.
-	// NOTE: It is 32 bits right?!
-	if (val < 0) {
-		val &= ~(1 << 31);
-	}
-
-	int pos = 0;
-	while (val != 0) {
-		pos += 1;
-		val = val >> 1;
-	}
-	return pos;
-}
-
-///////////////////////////////////////////////////////////
-
 const float minThickness = 0.03; // meters
 const float maxThickness = 0.50; // meters
 
@@ -91,16 +41,16 @@ const float minProgressDistance = 0.01;
 #define TRACE_RESULT_HIT     1
 #define TRACE_RESULT_UNKNOWN 2
 
-struct LightFieldSurface {
+//struct LightFieldSurface {
 
-		sampler2D/*Array*/          radianceProbeGrid;
-		sampler2D/*Array*/          normalProbeGrid;
-		sampler2D/*Array*/          distanceProbeGrid;
-		sampler2D/*Array*/          lowResolutionDistanceProbeGrid;
-		Vector3int32            probeCounts; // assumed to be a power of two!
-		Point3                  probeStartPosition;
-		Vector3                 probeStep;
-		int                     lowResolutionDownsampleFactor;
+		//sampler2D/*Array*/          radianceProbeGrid;
+		//sampler2D/*Array*/          normalProbeGrid;
+		//sampler2D/*Array*/          distanceProbeGrid;
+		//sampler2D/*Array*/          lowResolutionDistanceProbeGrid;
+		//Vector3int32            probeCounts; // assumed to be a power of two!
+		//Point3                  probeStartPosition;
+		//Vector3                 probeStep;
+		//int                     lowResolutionDownsampleFactor;
 		//TextureCubeArray        irradianceProbeGrid;
 		//TextureCubeArray        meanDistProbeGrid;
 /*
@@ -115,7 +65,7 @@ struct LightFieldSurface {
     TextureCubeArray        irradianceProbeGrid;
     TextureCubeArray        meanDistProbeGrid;
 */
-};
+//};
 
 
 float distanceSquared(Point2 v0, Point2 v1) {
@@ -752,7 +702,7 @@ bool trace(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float t
 vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3 normal)
 {
 	// TODO: Don't assume perfect mirror!!!
-	vec3 wi = normalize(reflect(wo, normal));
+	vec3 wi = normalize(reflect(-wo, normal));
 	vec3 origin = world_space_pos + 0.001 * wi;
 	Ray world_space_ray = makeRay(origin, wi);
 

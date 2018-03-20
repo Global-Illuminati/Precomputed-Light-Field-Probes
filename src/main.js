@@ -28,6 +28,7 @@ var picoTimer;
 var picoPrecomputeTimer;
 
 var defaultShader;
+var precomputeShader;
 var shadowMapShader;
 
 var blitTextureDrawCall;
@@ -151,11 +152,18 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 				.texture('u_specular_map', loadTexture(specularMap))
 				.texture('u_normal_map', loadTexture(normalMap));
 
+				var precomputeDrawCall = app.createDrawCall(precomputeShader, vertexArray)
+				.uniformBlock('SceneUniforms', sceneUniforms)
+				.texture('u_diffuse_map', loadTexture(diffuseMap))
+				.texture('u_specular_map', loadTexture(specularMap))
+				.texture('u_normal_map', loadTexture(normalMap));
+
 				var shadowMappingDrawCall = app.createDrawCall(shadowMapShader, vertexArray);
 
 				meshes.push({
 					modelMatrix: modelMatrix || mat4.create(),
 					drawCall: drawCall,
+					precomputeDrawCall: precomputeDrawCall,
 					shadowMapDrawCall: shadowMappingDrawCall
 				});
 
@@ -226,6 +234,7 @@ function init() {
 	shaderLoader.addShaderFile('light_field_probe_theirs.glsl');
 	shaderLoader.addShaderProgram('unlit', 'unlit.vert.glsl', 'unlit.frag.glsl');
 	shaderLoader.addShaderProgram('default', 'default.vert.glsl', 'default.frag.glsl');
+	shaderLoader.addShaderProgram('precompute', 'default.vert.glsl', 'precompute.frag.glsl');
 	shaderLoader.addShaderProgram('environment', 'environment.vert.glsl', 'environment.frag.glsl');
 	shaderLoader.addShaderProgram('textureBlit', 'screen_space.vert.glsl', 'texture_blit.frag.glsl');
 	shaderLoader.addShaderProgram('cubemapBlit', 'screen_space.vert.glsl', 'cubemap_blit.frag.glsl');
@@ -252,6 +261,7 @@ function init() {
 		setupProbeDrawCall(probeVertexArray, unlitShader);
 
 		defaultShader = makeShader('default', data);
+		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 
@@ -638,6 +648,8 @@ function renderScene() {
 		var mesh = meshes[i];
 
 		mesh.drawCall
+
+		// Default uniforms
 		.uniform('u_world_from_local', mesh.modelMatrix)
 		.uniform('u_view_from_world', camera.viewMatrix)
 		.uniform('u_projection_from_view', camera.projectionMatrix)
@@ -645,6 +657,17 @@ function renderScene() {
 		.uniform('u_dir_light_view_direction', dirLightViewDirection)
 		.uniform('u_light_projection_from_world', lightViewProjection)
 		.texture('u_shadow_map', shadowMap)
+
+		// GI uniforms
+		.texture('L.radianceProbeGrid', probeOctahedrals['radiance'])
+		.texture('L.normalProbeGrid', probeOctahedrals['normals'])
+		.texture('L.distanceProbeGrid', probeOctahedrals['distanceHigh'])
+		.texture('L.lowResolutionDistanceProbeGrid', probeOctahedrals['distanceLow'])
+		.uniform('L.probeCounts', new Int32Array([1, 1, 1]))
+		.uniform('L.probeStartPosition', probeLocations[0])
+		.uniform('L.probeStep', vec3.fromValues(1, 1, 1)) // TODO: Shouldn't matter for now
+		.uniform('L.lowResolutionDownsampleFactor', 16) // TODO: Use some variable value!
+
 		.draw();
 
 	}
@@ -755,7 +778,7 @@ function renderProbeCubemaps() {
 
 			var mesh = meshes[i];
 
-			mesh.drawCall
+			mesh.precomputeDrawCall
 			.uniform('u_world_from_local', mesh.modelMatrix)
 			.uniform('u_view_from_world', viewMatrix)
 			.uniform('u_projection_from_view', projectionMatrix)
