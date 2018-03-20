@@ -650,6 +650,7 @@ function renderScene() {
 		mesh.drawCall
 
 		// Default uniforms
+		.uniform('u_camera_position', camera.position)
 		.uniform('u_world_from_local', mesh.modelMatrix)
 		.uniform('u_view_from_world', camera.viewMatrix)
 		.uniform('u_projection_from_view', camera.projectionMatrix)

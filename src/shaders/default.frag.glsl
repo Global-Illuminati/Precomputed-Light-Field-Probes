@@ -28,6 +28,8 @@ uniform sampler2D u_shadow_map;
 uniform vec3 u_dir_light_color;
 uniform vec3 u_dir_light_view_direction;
 
+uniform vec3 u_camera_position;
+
 ///////////////////////////////////
 // GI related
 
@@ -110,7 +112,9 @@ void main()
 
 	// TODO: Consider the specularity and energy conservation, yada yada...
 	vec3 fragment_world_space_pos = v_world_position;
-	vec3 indirect_light = compute_glossy_ray(L, fragment_world_space_pos, wo, N);
+	vec3 fragment_world_space_normal = normalize(v_world_space_normal);
+	vec3 fragment_to_camera_dir = normalize(u_camera_position - fragment_world_space_pos);
+	vec3 indirect_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
 	color += indirect_light;
 
 	//////////////////////////////////////////////////////////
