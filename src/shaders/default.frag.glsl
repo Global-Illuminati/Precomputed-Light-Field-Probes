@@ -3,75 +3,7 @@ precision highp float;
 precision lowp sampler2D;
 precision lowp sampler2DArray;
 
-///////////////////////////////////
-// Compability definitions
-
-struct Ray
-{
-	vec3 origin;
-	vec3 direction;
-};
-
-Ray makeRay(in vec3 origin, in vec3 direction)
-{
-	Ray ray;
-	ray.origin = origin;
-	ray.direction = normalize(direction);
-	return ray;
-}
-
-#define Point2  vec2
-#define Point3  vec3
-
-#define Vector2 vec2
-#define Vector3 vec3
-
-// NOTE: We need this to be 32 bits to be able to findMSB
-//precision highp ivec3;
-#define Vector3int32 highp ivec3
-
-// Not defined until GLSL 400
-// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/findMSB.xhtml
-int findMSB(highp int val)
-{
-	if (val == 0 || val == -1) return -1;
-
-	// For negative integers, set the sign bit to zero so we can use the same method for all numbers and not always get
-	// bit 32 as the MSB for all negative numbers.
-	// NOTE: It is 32 bits right?!
-	if (val < 0) {
-		val &= ~(1 << 31);
-	}
-
-	int pos = 0;
-	while (val != 0) {
-		pos += 1;
-		val = val >> 1;
-	}
-	return pos;
-}
-
-///////////////////////////////////
-// GI related
-
-uniform struct LightFieldSurface
-{
-	sampler2D/*Array*/      radianceProbeGrid;
-	sampler2D/*Array*/      normalProbeGrid;
-	sampler2D/*Array*/      distanceProbeGrid;
-	sampler2D/*Array*/      lowResolutionDistanceProbeGrid;
-	Vector3int32            probeCounts; // assumed to be a power of two!
-	Point3                  probeStartPosition;
-	Vector3                 probeStep;
-	int                     lowResolutionDownsampleFactor;
-	//TextureCubeArray        irradianceProbeGrid;
-	//TextureCubeArray        meanDistProbeGrid;
-} L;
-
-///////////////////////////////////
-
 #include <common.glsl>
-#include <light_field_probe_theirs.glsl>
 
 //
 // NOTE: All fragment calculations are in *view space*
@@ -95,6 +27,27 @@ uniform sampler2D u_shadow_map;
 
 uniform vec3 u_dir_light_color;
 uniform vec3 u_dir_light_view_direction;
+
+///////////////////////////////////
+// GI related
+
+uniform struct LightFieldSurface
+{
+	sampler2D/*Array*/      radianceProbeGrid;
+	sampler2D/*Array*/      normalProbeGrid;
+	sampler2D/*Array*/      distanceProbeGrid;
+	sampler2D/*Array*/      lowResolutionDistanceProbeGrid;
+	Vector3int32            probeCounts; // assumed to be a power of two!
+	Point3                  probeStartPosition;
+	Vector3                 probeStep;
+	int                     lowResolutionDownsampleFactor;
+	//TextureCubeArray        irradianceProbeGrid;
+	//TextureCubeArray        meanDistProbeGrid;
+} L;
+
+#include <light_field_probe_theirs.glsl>
+
+///////////////////////////////////
 
 layout(location = 0) out vec4 o_color;
 

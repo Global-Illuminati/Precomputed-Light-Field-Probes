@@ -86,4 +86,52 @@ float sample_shadow_map_pcf(in sampler2D shadow_map, in vec2 uv, in float compar
 
 }
 
+struct Ray
+{
+	vec3 origin;
+	vec3 direction;
+};
+
+Ray makeRay(in vec3 origin, in vec3 direction)
+{
+	Ray ray;
+	ray.origin = origin;
+	ray.direction = normalize(direction);
+	return ray;
+}
+
+///////////////////////////////////
+// Compability definitions (needed for the probe code)
+
+#define Point2  vec2
+#define Point3  vec3
+
+#define Vector2 vec2
+#define Vector3 vec3
+
+// NOTE: We need this to be 32 bits to be able to findMSB
+//precision highp ivec3;
+#define Vector3int32 highp ivec3
+
+// Not defined until GLSL 400
+// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/findMSB.xhtml
+int findMSB(highp int val)
+{
+	if (val == 0 || val == -1) return -1;
+
+	// For negative integers, set the sign bit to zero so we can use the same method for all numbers and not always get
+	// bit 32 as the MSB for all negative numbers.
+	// NOTE: It is 32 bits right?!
+	if (val < 0) {
+		val &= ~(1 << 31);
+	}
+
+	int pos = 0;
+	while (val != 0) {
+		pos += 1;
+		val = val >> 1;
+	}
+	return pos;
+}
+
 #endif // COMMON_GLSL
