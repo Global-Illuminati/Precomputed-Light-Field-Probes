@@ -116,6 +116,28 @@ void compute_ray_segments(vec3 origin, vec3 direction_frac, float t_min, float t
 	}
 }
 
+/**
+ *
+ * Returns the distance along v from the origin to the intersection
+ * with ray R (which it is assumed to intersect)
+ *
+ */
+float distance_to_intersection(in Ray R, in vec3 v)
+{
+    float numer;
+    float denom = v.y * R.direction.z - v.z * R.direction.y;
+
+    if (abs(denom) > 0.1) {
+        numer = R.origin.y * R.direction.z - R.origin.z * R.direction.y;
+    } else {
+        // We're in the yz plane; use another one
+        numer = R.origin.x * R.direction.y - R.origin.y * R.direction.x;
+        denom = v.x * R.direction.y - v.y * R.direction.x;
+    }
+
+    return numer / denom;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Light field ray tracing
 
@@ -134,11 +156,101 @@ TraceResult high_resolution_trace_one_segment(
 bool low_resolution_trace_one_segment(
 	LightFieldSurface L,
 	Ray probe_space_ray,
-	vec2 tex_coord,
+	inout vec2 tex_coord,
 	vec2 segment_end_tex_coord,
-	vec2 high_res_end_tex_coord)
+	inout vec2 end_high_res_tex_coord)
 {
-	// TODO! (also make sure the arguments are correct)
+	vec2 low_res_size     = textureSize(L.low_res_distance_probe);
+	vec2 low_res_inv_size = vec2(1.0) / low_res_size;
+
+	// Convert the texels to pixel coordinates:
+	vec2 P0 = tex_coord * low_res_size;
+	vec2 P1 = segment_end_tex_coord * low_res_size;
+
+	// If the line is degenerate, make it cover at least one pixel
+	// to avoid handling zero-pixel extent as a special case later
+	P1 += vec2((distanceSquared(P0, P1) < 0.0001) ? 0.01 : 0.0);
+	// In pixel coordinates
+	vec2 delta = P1 - P0;
+
+	// Permute so that the primary iteration is in x to reduce large branches later
+	bool permute = false;
+	if (abs(delta.x) < abs(delta.y))
+	{
+		// This is a more-vertical line
+		permute = true;
+		delta = delta.yx; P0 = P0.yx; P1 = P1.yx;
+	}
+
+	float step_dir = sign(delta.x);
+	float invdx = step_dir / delta.x;
+	vec2  dP = vec2(step_dir, delta.y * invdx);
+
+	vec3 initial_direction_from_probe = octDecode(tex_coord * vec2(2.0) - vec2(1.0));
+	float prev_radial_dist_max_estimate = max(0.0, distance_to_intersection(probe_space_ray, initial_direction_from_probe));
+	// Slide P from P0 to P1
+	float end = P1.x * step_dir;
+
+	float absInvdPY = 1.0 / abs(dP.y);
+
+	// Don't ever move farther from texCoord than this distance, in texture space,
+	// because you'll move past the end of the segment and into a different projection
+	float maxTexCoordDistance = lengthSquared(segmentEndTexCoord - texCoord);
+
+	for (Point2 P = P0; ((P.x * sign(delta.x)) <= end); ) {
+
+		Point2 hitPixel = permute ? P.yx : P;
+
+		float sceneRadialDistMin = texelFetch(lightFieldSurface.lowResolutionDistanceProbeGrid.sampler, int3(hitPixel, probeIndex), 0).r;
+
+		// Distance along each axis to the edge of the low-res texel
+		Vector2 intersectionPixelDistance = (sign(delta) * 0.5 + 0.5) - sign(delta) * frac(P);
+
+		// abs(dP.x) is 1.0, so we skip that division
+		// If we are parallel to the minor axis, the second parameter will be inf, which is fine
+		float rayDistanceToNextPixelEdge = min(intersectionPixelDistance.x, intersectionPixelDistance.y * absInvdPY);
+
+		// The exit coordinate for the ray (this may be *past* the end of the segment, but the
+		// callr will handle that)
+		endHighResTexCoord = (P + dP * rayDistanceToNextPixelEdge) * lowResInvSize;
+		endHighResTexCoord = permute ? endHighResTexCoord.yx : endHighResTexCoord;
+
+		if (lengthSquared(endHighResTexCoord - texCoord) > maxTexCoordDistance) {
+				// Clamp the ray to the segment, because if we cross a segment boundary in oct space
+				// then we bend the ray in probe and world space.
+				endHighResTexCoord = segmentEndTexCoord;
+		}
+
+		// Find the 3D point *on the trace ray* that corresponds to the tex coord.
+		// This is the intersection of the ray out of the probe origin with the trace ray.
+		Vector3 directionFromProbe = octDecode(endHighResTexCoord * 2.0 - 1.0);
+		float distanceFromProbeToRay = max(0.0, distanceToIntersection(probeSpaceRay, directionFromProbe));
+
+		float maxRadialRayDistance = max(distanceFromProbeToRay, prevRadialDistMaxEstimate);
+		prevRadialDistMaxEstimate = distanceFromProbeToRay;
+
+		if (sceneRadialDistMin < maxRadialRayDistance) {
+				// A conservative hit.
+				//
+				//  -  endHighResTexCoord is already where the ray would have LEFT the texel
+				//     that created the hit.
+				//
+				//  -  texCoord should be where the ray entered the texel
+				texCoord = (permute ? P.yx : P) * lowResInvSize;
+				return true;
+		}
+
+		// Ensure that we step just past the boundary, so that we're slightly inside the next
+		// texel, rather than at the boundary and randomly rounding one way or the other.
+		const float epsilon = 0.001; // pixels
+		P += dP * (rayDistanceToNextPixelEdge + epsilon);
+	} // for each pixel on ray
+
+	// If exited the loop, then we went *past* the end of the segment, so back up to it (in practice, this is ignored
+	// by the caller because it indicates a miss for the whole segment)
+	texCoord = segmentEndTexCoord;
+
+	return false;
 }
 
 TraceResult trace_one_ray_segment(

@@ -1,7 +1,10 @@
 #version 300 es
 precision highp float;
+precision lowp sampler2D;
+precision lowp sampler2DArray;
 
 #include <common.glsl>
+#include <light_field_probe_theirs.glsl>
 
 //
 // NOTE: All fragment calculations are in *view space*

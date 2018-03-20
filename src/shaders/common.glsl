@@ -8,6 +8,11 @@ float saturate(in float value) {
 	return clamp(value, 0.0, 1.0);
 }
 
+float squaredLength(in vec2 v)
+{
+	return dot(v, v);
+}
+
 float squaredLength(in vec3 v)
 {
 	return dot(v, v);
