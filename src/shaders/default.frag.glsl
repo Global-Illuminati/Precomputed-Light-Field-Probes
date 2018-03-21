@@ -114,8 +114,9 @@ void main()
 	vec3 fragment_world_space_pos = v_world_position;
 	vec3 fragment_world_space_normal = normalize(v_world_space_normal);
 	vec3 fragment_to_camera_dir = normalize(u_camera_position - fragment_world_space_pos);
-	vec3 indirect_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
-	color += indirect_light;
+	vec3 indirect_specular_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
+
+	color += shininess * indirect_specular_light;
 
 	//////////////////////////////////////////////////////////
 

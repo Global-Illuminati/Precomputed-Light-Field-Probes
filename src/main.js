@@ -263,7 +263,26 @@ function init() {
 		defaultShader = makeShader('default', data);
 		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
+
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
+
+		{
+			let m = mat4.create();
+			let r = quat.fromEuler(quat.create(), 0, 45, 0);
+			let t = vec3.fromValues(0, 1, 0);
+			let s = vec3.fromValues(0.06, 0.06, 0.06);
+			mat4.fromRotationTranslationScale(m, r, t, s);
+			loadObject('teapot/', 'teapot.obj', 'default.mtl', m);
+		}
+
+		{
+			let m = mat4.create();
+			let r = quat.fromEuler(quat.create(), 0, -25, 0);
+			let t = vec3.fromValues(-15, 4, -4);
+			let s = vec3.fromValues(3, 3, 3);
+			mat4.fromRotationTranslationScale(m, r, t, s);
+			loadObject('cube/', 'cube.obj', 'test.mtl', m);
+		}
 
 		setupProbes(1024, 1024);
 
@@ -790,6 +809,10 @@ function renderProbeCubemaps() {
 			.draw();
 
 		}
+
+		probeDrawCall
+		.uniform('u_projection_from_world', lightViewProjection)
+		.draw();
 
 		var inverseViewProjection = mat4.create();
 		mat4.mul(inverseViewProjection, projectionMatrix, viewMatrix);
