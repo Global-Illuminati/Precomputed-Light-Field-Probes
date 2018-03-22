@@ -22,7 +22,7 @@ void main()
 	mat4 view_from_local = u_view_from_world * u_world_from_local;
 
 	// NOTE: normal only works for uniformly scaled objects!
-	vec4 world_space_normal = u_world_from_local * vec4(a_normal, 0.0);
+	vec4 world_space_normal = normalize(u_world_from_local * vec4(a_normal, 0.0));
 	vec4 view_space_normal = u_view_from_world * world_space_normal;
 
 	vec4 world_space_position = u_world_from_local * vec4(a_position, 1.0);

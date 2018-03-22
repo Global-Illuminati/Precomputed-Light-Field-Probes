@@ -1,7 +1,10 @@
 #version 300 es
+
+// TODO: We propbably don't need all of this precision! Just for making sure while debugging...
+precision highp int;
 precision highp float;
-precision lowp sampler2D;
-precision lowp sampler2DArray;
+precision highp sampler2D;
+precision highp sampler2DArray;
 
 #include <common.glsl>
 
@@ -116,7 +119,8 @@ void main()
 	vec3 fragment_to_camera_dir = normalize(u_camera_position - fragment_world_space_pos);
 	vec3 indirect_specular_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
 
-	color += shininess * indirect_specular_light;
+	// NOTE: The 3.0 is just to make it a bit more visible!
+	color += 3.0 * shininess * indirect_specular_light;
 
 	//////////////////////////////////////////////////////////
 

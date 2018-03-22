@@ -14,7 +14,7 @@
 #include <common.glsl>
 #include <octahedral.glsl>
 
-const float minThickness = 0.03; // meters
+const float minThickness = 0.03;//0.25; // meters (0.25 looks better but probably isn't)
 const float maxThickness = 0.50; // meters
 
 // Points exactly on the boundary in octahedral space (x = 0 and y = 0 planes) map to two different
@@ -696,6 +696,21 @@ bool trace(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float t
     return (hitProbeIndex != -1);
 }
 
+/**
+ Trace a single probe and return result as is
+ */
+TraceResult trace_simple(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float tMax, out Point2 hitProbeTexCoord, out ProbeIndex hitProbeIndex) {
+
+    hitProbeIndex = -1;
+    float tMin = 0.0f;
+    ProbeIndex baseIndex = 0;
+
+    TraceResult result = traceOneProbeOct(lightFieldSurface, relativeProbeIndex(lightFieldSurface, baseIndex, 0),
+            worldSpaceRay, tMin, tMax, hitProbeTexCoord);
+
+    return result;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Utility (TODO: maybe move these functions to the main shader?)
 
@@ -710,6 +725,21 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 	ProbeIndex hit_probe_index;
 	vec2 hit_tex_coord;
 
+	TraceResult result = trace_simple(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index);
+	switch (result)
+	{
+		case TRACE_RESULT_HIT:
+			return textureLod(L.radianceProbeGrid, vec2(hit_tex_coord), 0.0).rgb;
+
+		case TRACE_RESULT_MISS:
+			// TODO: Sample from environment!
+			return vec3(0.0, 0.0, 1.0);
+
+		case TRACE_RESULT_UNKNOWN:
+			return vec3(1.0, 0.0, 1.0);
+	}
+
+/*
 	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, true))
 	{
 		// TODO: Missed scene, use some fallback method
@@ -720,7 +750,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 		// TODO: Texture Array - Sample into a texture array and use the probe_index
 		return textureLod(L.radianceProbeGrid, vec2(hit_tex_coord), 0.0).rgb;
 	}
-
+*/
 }
 
 #endif // LIGHT_FIELD_PROBE_GLSL
