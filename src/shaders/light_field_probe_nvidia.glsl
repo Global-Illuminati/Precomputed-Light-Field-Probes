@@ -545,10 +545,6 @@ TraceResult traceOneRaySegment
     inout float tMin, // out only
     inout float tMax, 
     inout vec2  hitProbeTexCoord) {
-    
-    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO 
-    //return TRACE_RESULT_UNKNOWN;
-    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO 
 
     // Euclidean probe-space line segment, composed of two points on the probeSpaceRay
     Vector3 probeSpaceStartPoint = probeSpaceRay.origin + probeSpaceRay.direction * (t0 + rayBumpEpsilon);
@@ -591,7 +587,7 @@ TraceResult traceOneRaySegment
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,
             // so we don't need to clamp to the segment length
 
-#if 1            
+#if 0            
             TraceResult result = highResolutionTraceOneRaySegment(lightFieldSurface, probeSpaceRay, texCoord, endTexCoord, probeIndex, tMin, tMax, hitProbeTexCoord);
 
             if (result != TRACE_RESULT_MISS) {
@@ -618,7 +614,7 @@ TraceResult traceOneRaySegment
             // instead of getting stuck back on the low-res texel we just verified...but, if that fails on the 
             // very first texel, we'll want to restart the high-res trace exactly where we left off, so
             // don't bump by an entire high-res texel
-            texCoord = endTexCoord + texCoordRayDirection * invSize(lightFieldSurface.distanceProbeGrid).x * 0.1;
+            texCoord = endTexCoord + texCoordRayDirection * invSize(lightFieldSurface.distanceProbeGrid).x * 1.01;
         }
     } // while low-resolution trace
 
@@ -762,7 +758,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 {
 	// TODO: Don't assume perfect mirror!!!
 	vec3 wi = normalize(reflect(-wo, normal));
-	vec3 origin = world_space_pos + 0.001 * wi;
+	vec3 origin = world_space_pos + 0.2 * normal + 0.1 * wi;
 	Ray world_space_ray = makeRay(origin, wi);
 
 	float hit_distance = 10000.0;
