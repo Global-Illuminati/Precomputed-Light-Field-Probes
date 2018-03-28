@@ -18,6 +18,12 @@
 // Temporary stuff! Clean up and optimize later! //
 ///////////////////////////////////////////////////
 
+const vec2 TEX_SIZE       = vec2(1024.0);
+const vec2 TEX_SIZE_SMALL = vec2(64.0);
+
+const vec2 INV_TEX_SIZE       = vec2(1.0) / TEX_SIZE;
+const vec2 INV_TEX_SIZE_SMALL = vec2(1.0) / TEX_SIZE_SMALL;
+
 vec2 size(in sampler2D tex)
 {
     return vec2(textureSize(tex, 0));
@@ -301,7 +307,7 @@ TraceResult highResolutionTraceOneRaySegment
     float texCoordDistance       = length(texCoordDelta);
     Vector2 texCoordDirection    = texCoordDelta * (1.0 / texCoordDistance);
 
-    float texCoordStep = invSize(lightFieldSurface.distanceProbeGrid).x * (texCoordDistance / maxComponent(abs(texCoordDelta)));
+    float texCoordStep = /*invSize(lightFieldSurface.distanceProbeGrid)*/INV_TEX_SIZE.x * (texCoordDistance / maxComponent(abs(texCoordDelta)));
     
     Vector3 directionFromProbeBefore = octDecode(startTexCoord * 2.0 - 1.0);
     float distanceFromProbeToRayBefore = max(0.0, distanceToIntersection(probeSpaceRay, directionFromProbeBefore));
@@ -318,7 +324,7 @@ TraceResult highResolutionTraceOneRaySegment
                 //float distanceFromProbeToSurface = texelFetch(lightFieldSurface.distanceProbeGrid,
                 //    ivec3(lightFieldSurface.distanceProbeGrid.size.xy * startTexCoord, probeIndex), 0).r;
                 float distanceFromProbeToSurface = texelFetch(lightFieldSurface.distanceProbeGrid,
-                    ivec2(size(lightFieldSurface.distanceProbeGrid) * startTexCoord), 0).r;
+                    ivec2(/*size(lightFieldSurface.distanceProbeGrid)*/ TEX_SIZE * startTexCoord), 0).r;
 
                 tMax = length(probeSpaceRay.origin - directionFromProbeBefore * distanceFromProbeToSurface);
                 hitProbeTexCoord = startTexCoord;
@@ -338,7 +344,7 @@ TraceResult highResolutionTraceOneRaySegment
         //float distanceFromProbeToSurface = texelFetch(lightFieldSurface.distanceProbeGrid,
         //    ivec3(lightFieldSurface.distanceProbeGrid.size.xy * texCoord, probeIndex), 0).r;
         float distanceFromProbeToSurface = texelFetch(lightFieldSurface.distanceProbeGrid,
-            ivec2(size(lightFieldSurface.distanceProbeGrid) * texCoord), 0).r;
+            ivec2(/*size(lightFieldSurface.distanceProbeGrid)*/ TEX_SIZE * texCoord), 0).r;
 
         // Find the corresponding point in probe space. This defines a line through the 
         // probe origin
@@ -366,7 +372,7 @@ TraceResult highResolutionTraceOneRaySegment
             // Read the normal for use in detecting backfaces
             //vec3 normal = octDecode(texelFetch(lightFieldSurface.normalProbeGrid, ivec3(lightFieldSurface.distanceProbeGrid.size.xy * texCoord, probeIndex), 0).xy * lightFieldSurface.normalProbeGrid.readMultiplyFirst.xy + lightFieldSurface.normalProbeGrid.readAddSecond.xy);
             vec3 packedNormal = texelFetch(lightFieldSurface.normalProbeGrid,
-                ivec2(size(lightFieldSurface.distanceProbeGrid) * texCoord), 0).rgb;
+                ivec2(/*size(lightFieldSurface.normalProbeGrid)*/ TEX_SIZE * texCoord), 0).rgb;
             vec3 normal = unpackNormal(packedNormal);
 
             // Only extrude towards and away from the view ray, not perpendicular to it
@@ -440,8 +446,8 @@ bool lowResolutionTraceOneSegment
     in Point2            segmentEndTexCoord, 
     inout Point2         endHighResTexCoord) {
         
-    Vector2 lowResSize    = size(lightFieldSurface.lowResolutionDistanceProbeGrid);
-    Vector2 lowResInvSize = invSize(lightFieldSurface.lowResolutionDistanceProbeGrid);
+    Vector2 lowResSize    = TEX_SIZE_SMALL;//size(lightFieldSurface.lowResolutionDistanceProbeGrid);
+    Vector2 lowResInvSize = INV_TEX_SIZE_SMALL;//invSize(lightFieldSurface.lowResolutionDistanceProbeGrid);
 
     // Convert the texels to pixel coordinates:
     Point2 P0 = texCoord           * lowResSize;
@@ -587,7 +593,7 @@ TraceResult traceOneRaySegment
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,
             // so we don't need to clamp to the segment length
 
-#if 0            
+#if 0
             TraceResult result = highResolutionTraceOneRaySegment(lightFieldSurface, probeSpaceRay, texCoord, endTexCoord, probeIndex, tMin, tMax, hitProbeTexCoord);
 
             if (result != TRACE_RESULT_MISS) {
@@ -605,7 +611,7 @@ TraceResult traceOneRaySegment
         // Recompute each time around the loop to avoid increasing the peak register count
         Vector2 texCoordRayDirection = normalize(segmentEndTexCoord - texCoord);
 
-        if (dot(texCoordRayDirection, segmentEndTexCoord - endTexCoord) <= invSize(lightFieldSurface.distanceProbeGrid).x) {
+        if (dot(texCoordRayDirection, segmentEndTexCoord - endTexCoord) <= /*invSize(lightFieldSurface.distanceProbeGrid)*/ INV_TEX_SIZE.x) {
             // The high resolution trace reached the end of the segment; we've failed to find a hit
             return TRACE_RESULT_MISS;
         } else {
@@ -614,7 +620,7 @@ TraceResult traceOneRaySegment
             // instead of getting stuck back on the low-res texel we just verified...but, if that fails on the 
             // very first texel, we'll want to restart the high-res trace exactly where we left off, so
             // don't bump by an entire high-res texel
-            texCoord = endTexCoord + texCoordRayDirection * invSize(lightFieldSurface.distanceProbeGrid).x * 1.01;
+            texCoord = endTexCoord + texCoordRayDirection * /*invSize(lightFieldSurface.distanceProbeGrid)*/ INV_TEX_SIZE.x * 0.01;
         }
     } // while low-resolution trace
 
@@ -724,7 +730,7 @@ bool trace(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float t
         // @TextureArray
         //float probeDistance = texelFetch(lightFieldSurface.distanceProbeGrid, ivec3(ivec2(hitProbeTexCoord * lightFieldSurface.distanceProbeGrid.size.xy), hitProbeIndex), 0).r;
         float probeDistance = texelFetch(lightFieldSurface.distanceProbeGrid,
-            ivec2(hitProbeTexCoord * size(lightFieldSurface.distanceProbeGrid)), 0).r;
+            ivec2(hitProbeTexCoord * /*size(lightFieldSurface.distanceProbeGrid)*/ TEX_SIZE), 0).r;
 
         if (probeDistance < 10000.0) {
             Point3 hitLocation = probeLocation(lightFieldSurface, hitProbeIndex) + worldSpaceRay.direction * probeDistance;
@@ -761,7 +767,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 	vec3 origin = world_space_pos + 0.2 * normal + 0.1 * wi;
 	Ray world_space_ray = makeRay(origin, wi);
 
-	float hit_distance = 10000.0;
+	float hit_distance = 11000.0; // (clear/sky depth is 10000)
 	ProbeIndex hit_probe_index;
 	vec2 hit_tex_coord;
 
