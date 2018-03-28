@@ -91,7 +91,8 @@ GridCoord probeIndexToGridCoord(in LightFieldSurface L, ProbeIndex index) {
     iPos.y = (index & ((L.probeCounts.x * L.probeCounts.y) - 1)) >> findMSB(L.probeCounts.x);
     iPos.z = index >> findMSB(L.probeCounts.x * L.probeCounts.y);
 
-    return iPos;
+    //return iPos;
+    return ivec3(0, 0, 0); // @Simplification
 }
 
 /** probeCoords Coordinates of the probe, computed as part of the process. */
@@ -129,7 +130,8 @@ CycleIndex nearestProbeIndices(in LightFieldSurface L, Point3 X) {
 
 
 Point3 gridCoordToPosition(in LightFieldSurface L, GridCoord c) {
-    return L.probeStep * Vector3(c) + L.probeStartPosition;
+    //return L.probeStep * Vector3(c) + L.probeStartPosition;
+    return vec3(-10.0, 4.0, 0.0); // @Simplification
 }
 
 
@@ -196,6 +198,23 @@ void sort(inout vec3 v) {
     minSwap(v[0], v[1]);
 }
 
+vec3 sortFailsafeAndStupid(in vec3 v)
+{
+    float lowest  = min(min(v.x, v.y), min(v.y, v.z));
+    float highest = max(max(v.x, v.y), max(v.y, v.z));
+
+    bool xRep = v.x == lowest || v.x == highest;
+    bool yRep = v.y == lowest || v.y == highest;
+    bool zRep = v.z == lowest || v.z == highest;
+
+    float middle;
+    if      (!xRep) middle = v.x;
+    else if (!yRep) middle = v.y;
+    else if (!zRep) middle = v.z;
+
+    return vec3(lowest, middle, highest);
+}
+
 
 /** Segments a ray into the piecewise-continuous rays or line segments that each lie within
     one Euclidean octant, which correspond to piecewise-linear projections in octahedral space.
@@ -219,9 +238,17 @@ void computeRaySegments
     
     // Time values for intersection with x = 0, y = 0, and z = 0 planes, sorted
     // in increasing order
-    Vector3 t = origin * -directionFrac;
+    Vector3 t = origin * -directionFrac;  
     sort(t);
 
+/*
+    t = sortFailsafeAndStupid(t); // @Simplification
+    float diff = tMax - tMin;
+    float step = diff / 5.0;
+    for (int i = 0; i < 3; ++i) {
+        boundaryTs[i + 1] = tMin + (step + 1.0);
+    }
+*/
     // Copy the values into the interval boundaries.
     // This loop expands at compile time and eliminates the
     // relative indexing, so it is just three conditional move operations
@@ -519,6 +546,10 @@ TraceResult traceOneRaySegment
     inout float tMax, 
     inout vec2  hitProbeTexCoord) {
     
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO 
+    //return TRACE_RESULT_UNKNOWN;
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO 
+
     // Euclidean probe-space line segment, composed of two points on the probeSpaceRay
     Vector3 probeSpaceStartPoint = probeSpaceRay.origin + probeSpaceRay.direction * (t0 + rayBumpEpsilon);
     Vector3 probeSpaceEndPoint   = probeSpaceRay.origin + probeSpaceRay.direction * (t1 - rayBumpEpsilon);
@@ -554,16 +585,25 @@ TraceResult traceOneRaySegment
         if (! lowResolutionTraceOneSegment(lightFieldSurface, probeSpaceRay, probeIndex, texCoord, segmentEndTexCoord, endTexCoord)) {
             // The whole trace failed to hit anything           
             return TRACE_RESULT_MISS;
+            //return TRACE_RESULT_UNKNOWN;
         } else {
 
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,
             // so we don't need to clamp to the segment length
+
+#if 1            
             TraceResult result = highResolutionTraceOneRaySegment(lightFieldSurface, probeSpaceRay, texCoord, endTexCoord, probeIndex, tMin, tMax, hitProbeTexCoord);
 
             if (result != TRACE_RESULT_MISS) {
                 // High-resolution hit or went behind something, which must be the result for the whole segment trace
                 return result;
-            } 
+            }
+#else
+
+            // Low res hit assumed to be okay @Simplification
+            hitProbeTexCoord = endTexCoord;
+            return TRACE_RESULT_HIT;
+#endif
         } // else...continue the outer loop; we conservatively refined and didn't actually find a hit
 
         // Recompute each time around the loop to avoid increasing the peak register count
@@ -600,7 +640,8 @@ TraceResult traceOneProbeOct(in LightFieldSurface lightFieldSurface, in ProbeInd
     // How short of a ray segment is not worth tracing?
     const float degenerateEpsilon = 0.001; // meters
     
-    Point3 probeOrigin = probeLocation(lightFieldSurface, index);
+    //Point3 probeOrigin = probeLocation(lightFieldSurface, index);
+    Point3 probeOrigin = Point3(-10.0, 4.0, 0.0);// @Simplification
     
     Ray probeSpaceRay;
     probeSpaceRay.origin    = worldSpaceRay.origin - probeOrigin;
@@ -615,7 +656,19 @@ TraceResult traceOneProbeOct(in LightFieldSurface lightFieldSurface, in ProbeInd
     for (int i = 0; i < 4; ++i) {
         if (abs(boundaryTs[i] - boundaryTs[i + 1]) >= degenerateEpsilon) {
             TraceResult result = traceOneRaySegment(lightFieldSurface, probeSpaceRay, boundaryTs[i], boundaryTs[i + 1], index, tMin, tMax, hitProbeTexCoord);
-            
+#if 1
+            if (result == TRACE_RESULT_HIT)
+            {
+                // Hit!
+                return TRACE_RESULT_HIT;
+            }
+
+            if (result == TRACE_RESULT_UNKNOWN)
+            {
+                // Failed to find anything conclusive
+                return TRACE_RESULT_UNKNOWN;
+            }
+#else
             switch (result) {
             case TRACE_RESULT_HIT:
                 // Hit!            
@@ -625,6 +678,7 @@ TraceResult traceOneProbeOct(in LightFieldSurface lightFieldSurface, in ProbeInd
                 // Failed to find anything conclusive
                 return TRACE_RESULT_UNKNOWN;
             } // switch
+#endif
         } // if 
     } // For each segment
 
@@ -716,6 +770,21 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 	vec2 hit_tex_coord;
 
 	TraceResult result = trace_simple(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index);
+
+    if (result == TRACE_RESULT_HIT)
+    {
+        return textureLod(L.radianceProbeGrid, vec2(hit_tex_coord), 0.0).rgb;
+    }
+    else if (result == TRACE_RESULT_MISS)
+    {
+        // TODO: Sample from environment!
+		return vec3(0.0, 0.0, 1.0);
+    }
+    else if (result == TRACE_RESULT_UNKNOWN)
+    {
+        return vec3(1.0, 0.0, 1.0);
+    }
+/*
 	switch (result)
 	{
 		case TRACE_RESULT_HIT:
@@ -728,7 +797,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 		case TRACE_RESULT_UNKNOWN:
 			return vec3(1.0, 0.0, 1.0);
 	}
-
+*/
 /*
 	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, true))
 	{

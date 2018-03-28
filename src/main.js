@@ -203,6 +203,11 @@ function init() {
 	probe.add(settings, 'do_debug_show_probe').name('Show probe');
 	probe.add(settings, 'debug_show_probe_index').name('... probe index');
 	probe.add(settings, 'debug_show_probe_map', settings.debug_show_probe_map_options).name('... texture');
+	probe.open();
+
+	window.addEventListener('keydown', function(e) {
+		if (e.keyCode == 80 /* p(recompute) */) performPrecomputeThisFrame = true;
+	});
 
 	//////////////////////////////////////
 	// Basic GL state
@@ -553,13 +558,6 @@ function render() {
 		camera.update();
 
 		renderShadowMap();
-		renderScene();
-
-		var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
-		renderProbeLocations(viewProjection);
-
-		var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
-		renderEnvironment(inverseViewProjection)
 
 		if (performPrecomputeThisFrame) {
 
@@ -567,6 +565,7 @@ function render() {
 
 			renderProbeCubemaps();
 			octahedralProjectProbeCubemaps();
+			app.gl.finish();
 
 			let end = new Date().getTime();
 			let timePassed = end - start;
@@ -575,6 +574,16 @@ function render() {
 			performPrecomputeThisFrame = false;
 
 		}
+		else
+		{
+			renderScene();
+		}
+
+		var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
+		renderProbeLocations(viewProjection);
+
+		var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
+		renderEnvironment(inverseViewProjection)
 
 		if (settings.do_debug_show_probe) {
 

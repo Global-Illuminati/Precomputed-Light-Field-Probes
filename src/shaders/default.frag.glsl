@@ -123,7 +123,16 @@ void main()
 	color += 3.0 * shininess * indirect_specular_light;
 
 	//////////////////////////////////////////////////////////
-
+	
 	o_color = vec4(color, 1.0);
-
+/*
+	for (int i = 0; i < 9999999; i++)
+	{
+		o_color.rgb += vec3(
+			pow(sin(float(i)), 999.0 - float(i)),
+			pow(cos(float(i)), 9999.0 - float(i) * 2.0),
+			1.0 / (tan(float(i)) + 1.0)
+		);
+	}
+*/
 }
