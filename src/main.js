@@ -231,6 +231,7 @@ function init() {
 	shaderLoader.addShaderFile('octahedral.glsl')
 	shaderLoader.addShaderFile('scene_uniforms.glsl');
 	shaderLoader.addShaderFile('mesh_attributes.glsl');
+	shaderLoader.addShaderFile('light_field_probe_nvidia.glsl');
 	shaderLoader.addShaderFile('light_field_probe_theirs.glsl');
 	shaderLoader.addShaderProgram('unlit', 'unlit.vert.glsl', 'unlit.frag.glsl');
 	shaderLoader.addShaderProgram('default', 'default.vert.glsl', 'default.frag.glsl');

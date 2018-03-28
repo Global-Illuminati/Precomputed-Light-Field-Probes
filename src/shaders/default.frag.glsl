@@ -50,7 +50,7 @@ uniform struct LightFieldSurface
 	//TextureCubeArray        meanDistProbeGrid;
 } L;
 
-#include <light_field_probe_theirs.glsl>
+#include <light_field_probe_nvidia.glsl>
 
 ///////////////////////////////////
 

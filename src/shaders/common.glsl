@@ -8,14 +8,19 @@ float saturate(in float value) {
 	return clamp(value, 0.0, 1.0);
 }
 
-float squaredLength(in vec2 v)
+float lengthSquared(in vec2 v)
 {
 	return dot(v, v);
 }
 
-float squaredLength(in vec3 v)
+float lengthSquared(in vec3 v)
 {
 	return dot(v, v);
+}
+
+float maxComponent(vec2 a)
+{
+    return max(a.x, a.y);
 }
 
 void reortogonalize(in vec3 v0, inout vec3 v1)
