@@ -593,7 +593,7 @@ TraceResult traceOneRaySegment
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,
             // so we don't need to clamp to the segment length
 
-#if 0
+#if 1
             TraceResult result = highResolutionTraceOneRaySegment(lightFieldSurface, probeSpaceRay, texCoord, endTexCoord, probeIndex, tMin, tMax, hitProbeTexCoord);
 
             if (result != TRACE_RESULT_MISS) {
@@ -764,7 +764,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 {
 	// TODO: Don't assume perfect mirror!!!
 	vec3 wi = normalize(reflect(-wo, normal));
-	vec3 origin = world_space_pos + 0.2 * normal + 0.1 * wi;
+	vec3 origin = world_space_pos + 0.2 * normal + 0.1 * wi; // TODO: Remove the 0.2 * N when successfully doing high-res tracing
 	Ray world_space_ray = makeRay(origin, wi);
 
 	float hit_distance = 11000.0; // (clear/sky depth is 10000)

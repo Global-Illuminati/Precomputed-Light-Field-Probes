@@ -53,6 +53,7 @@ var probeLocations = [
 var octahedralDrawCall;
 var octahedralFramebuffer;
 var octahedralFramebufferLow;
+var lowPrecisionSizeDownsample = 16;
 var probeOctahedralSize;
 var probeOctahedrals = {
 	radiance: null,
@@ -237,7 +238,6 @@ function init() {
 	shaderLoader.addShaderFile('scene_uniforms.glsl');
 	shaderLoader.addShaderFile('mesh_attributes.glsl');
 	shaderLoader.addShaderFile('light_field_probe_nvidia.glsl');
-	shaderLoader.addShaderFile('light_field_probe_theirs.glsl');
 	shaderLoader.addShaderProgram('unlit', 'unlit.vert.glsl', 'unlit.frag.glsl');
 	shaderLoader.addShaderProgram('default', 'default.vert.glsl', 'default.frag.glsl');
 	shaderLoader.addShaderProgram('precompute', 'default.vert.glsl', 'precompute.frag.glsl');
@@ -499,7 +499,6 @@ function setupProbes(cubemapSize, octahedralSize) {
 	probeOctahedralSize = octahedralSize;
 
 	octahedralFramebufferLow = app.createFramebuffer();
-	var lowPrecisionSizeDownsample = 16;
 	var lowSize = octahedralSize / lowPrecisionSizeDownsample;
 	probeOctahedralSizeLow = lowSize;
 
@@ -510,26 +509,34 @@ function setupProbes(cubemapSize, octahedralSize) {
 	probeOctahedrals['radiance'] = app.createTexture2D(octahedralSize, octahedralSize, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGB,
-		internalFormat: PicoGL.R11F_G11F_B10F
+		internalFormat: PicoGL.R11F_G11F_B10F,
+		minFilter: PicoGL.NEAREST,
+		magFilter: PicoGL.NEAREST
 	});
 
 	// TODO: Probably encode normals as RG8 instead to compress it a bit (like in the paper). We don't need much precision anyway...
 	probeOctahedrals['normals'] = app.createTexture2D(octahedralSize, octahedralSize, {
 		type: PicoGL.UNSIGNED_BYTE,
 		format: PicoGL.RGB,
-		internalFormat: PicoGL.RGB8
+		internalFormat: PicoGL.RGB8,
+		minFilter: PicoGL.NEAREST,
+		magFilter: PicoGL.NEAREST
 	});
 
 	probeOctahedrals['distanceHigh'] = app.createTexture2D(octahedralSize, octahedralSize, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RED,
-		internalFormat: PicoGL.R16F
+		internalFormat: PicoGL.R16F,
+		minFilter: PicoGL.NEAREST,
+		magFilter: PicoGL.NEAREST
 	});
 
 	probeOctahedrals['distanceLow'] = app.createTexture2D(lowSize, lowSize, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RED,
-		internalFormat: PicoGL.R16F
+		internalFormat: PicoGL.R16F,
+		minFilter: PicoGL.NEAREST,
+		magFilter: PicoGL.NEAREST
 	});
 
 }
@@ -696,7 +703,7 @@ function renderScene() {
 		.uniform('L.probeCounts', new Int32Array([1, 1, 1]))
 		.uniform('L.probeStartPosition', probeLocations[0])
 		.uniform('L.probeStep', vec3.fromValues(1, 1, 1)) // TODO: Shouldn't matter for now
-		.uniform('L.lowResolutionDownsampleFactor', 16) // TODO: Use some variable value!
+		.uniform('L.lowResolutionDownsampleFactor', lowPrecisionSizeDownsample)
 
 		.draw();
 
