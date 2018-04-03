@@ -337,6 +337,7 @@ TraceResult highResolutionTraceOneRaySegment
     }
 
     for (float d = 0.0f; d <= texCoordDistance; d += texCoordStep) {
+    //for (float d = 0.0; d <= 0.0; d += texCoordStep) { // For testing if the loop is the reason of the crash!
         Point2 texCoord = (texCoordDirection * min(d + texCoordStep * 0.5, texCoordDistance)) + startTexCoord;
 
         // @TextureArray
@@ -587,7 +588,6 @@ TraceResult traceOneRaySegment
         if (! lowResolutionTraceOneSegment(lightFieldSurface, probeSpaceRay, probeIndex, texCoord, segmentEndTexCoord, endTexCoord)) {
             // The whole trace failed to hit anything
             return TRACE_RESULT_MISS;
-            //return TRACE_RESULT_UNKNOWN;
         } else {
 
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,

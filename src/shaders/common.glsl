@@ -25,7 +25,7 @@ float maxComponent(vec2 a)
 
 void reortogonalize(in vec3 v0, inout vec3 v1)
 {
-	// Perform Gram-Schmidt's re-ortogonalization process to make v1 orthagonal to v1
+	// Perform Gram-Schmidt's re-ortogonalization process to make v1 orthagonal to v0
 	v1 = normalize(v1 - dot(v1, v0) * v0);
 }
 

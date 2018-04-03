@@ -1,5 +1,10 @@
 'using strict';
 
+function validateFramebuffer(framebuffer) {
+	framebuffer.gl.finish();
+	console.assert(framebuffer.getStatus() === PicoGL.FRAMEBUFFER_COMPLETE, "Framebuffer is not complete!");
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 var stats;
@@ -100,9 +105,9 @@ function loadTexture(imageName, options) {
 	if (!options) {
 
 		var options = {};
-		options['minFilter'] = PicoGL.LINEAR_MIPMAP_NEAREST;
-		options['magFilter'] = PicoGL.LINEAR;
-		options['mipmaps'] = true;
+		options['minFilter'] = PicoGL.NEAREST;//LINEAR_MIPMAP_NEAREST;
+		options['magFilter'] = PicoGL.NEAREST;//LINEAR;
+		options['mipmaps'] = false;//true;
 
 	}
 
@@ -186,6 +191,7 @@ function init() {
 	var canvas = document.getElementById('canvas');
 	app = PicoGL.createApp(canvas, { antialias: true });
 	app.floatRenderTargets();
+	app.linearFloatTextures();
 
 	stats = new Stats();
 	stats.showPanel(1); // (frame time)
@@ -260,7 +266,10 @@ function init() {
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
-		.texture('u_environment_map', loadTexture('environments/ocean.jpg', {}));
+		.texture('u_environment_map', loadTexture('environments/ocean.jpg', {
+			minFilter: PicoGL.NEAREST,
+			magFilter: PicoGL.NEAREST
+		}));
 
 		var unlitShader = makeShader('unlit', data);
 		var probeVertexArray = createSphereVertexArray(0.08, 8, 8);
@@ -372,6 +381,7 @@ function setupDirectionalLightShadowMapFramebuffer(size) {
 	var colorBuffer = app.createTexture2D(size, size, {
 		format: PicoGL.RED,
 		internalFormat: PicoGL.R8,
+		type: PicoGL.UNSIGNED_BYTE,
 		minFilter: PicoGL.NEAREST,
 		magFilter: PicoGL.NEAREST
 	});
@@ -572,7 +582,8 @@ function render() {
 
 			renderProbeCubemaps();
 			octahedralProjectProbeCubemaps();
-			app.gl.finish();
+			app.gl.flush();
+			app.gl.finish(); // NOTE!
 
 			let end = new Date().getTime();
 			let timePassed = end - start;
@@ -581,10 +592,8 @@ function render() {
 			performPrecomputeThisFrame = false;
 
 		}
-		else
-		{
-			renderScene();
-		}
+
+		renderScene();
 
 		var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
 		renderProbeLocations(viewProjection);
@@ -609,13 +618,10 @@ function render() {
 		gpuTimePanel.update(picoTimer.gpuTime, 35);
 	}
 
-	//requestAnimationFrame(render);
+	app.gl.flush();
+	app.gl.finish(); // NOTE!
 
-	var renderDelta = new Date().getTime() - startStamp;
-	setTimeout( function() {
-		requestAnimationFrame(render);
-	}, 1000 / settings.target_fps - renderDelta-1000/120);
-
+	requestAnimationFrame(render);
 }
 
 function shadowMapNeedsRendering() {
@@ -790,6 +796,8 @@ function renderProbeCubemaps() {
 		probeRenderingFramebuffer.colorTarget(1, probeCubemaps['normals'], sideTarget);
 		probeRenderingFramebuffer.depthTarget(probeCubemaps['depth'], sideTarget);
 
+		validateFramebuffer(probeRenderingFramebuffer); // NOTE
+
 		// TODO: Fix this shit
 		// Create mock camera to be able to get the view space light direction. Probably clean this up some day...
 		var matrix3 = mat3.create();
@@ -856,11 +864,15 @@ function octahedralProjectProbeCubemaps() {
 		return;
 	}
 
-	octahedralFramebuffer.colorTarget(0, probeOctahedrals['radiance']);
-	octahedralFramebuffer.colorTarget(1, probeOctahedrals['distanceHigh']);
+	octahedralFramebuffer.colorTarget(0, probeOctahedrals['distanceHigh']);
+	octahedralFramebuffer.colorTarget(1, probeOctahedrals['radiance']);
 	octahedralFramebuffer.colorTarget(2, probeOctahedrals['normals']);
 
-	octahedralFramebufferLow.colorTarget(1, probeOctahedrals['distanceLow']);
+	validateFramebuffer(octahedralFramebuffer); // NOTE!
+
+	octahedralFramebufferLow.colorTarget(0, probeOctahedrals['distanceLow']);
+
+	validateFramebuffer(octahedralFramebufferLow); // NOTE!
 
 	app.noDepthTest().noBlend();
 

@@ -21,5 +21,5 @@ void main()
 	o_color = texture(u_cubemap, direction);
 
 	// For enhancing details in a depth map
-	//o_color.rgb = vec3(pow(o_color.r, 25.0));
+	//o_color.rgb = vec3(pow(abs(o_color.r), 25.0));
 }

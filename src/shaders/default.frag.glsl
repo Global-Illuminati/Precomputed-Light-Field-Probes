@@ -105,8 +105,8 @@ void main()
 
 		// specular
 		float specular_angle = saturate(dot(N, wh));
-		float specular_power = pow(2.0, 13.0 * shininess); // (fake glossiness from the specular map)
-		float specular = pow(specular_angle, specular_power);
+		float specular_power = pow(abs(2.0), 13.0 * shininess); // (fake glossiness from the specular map)
+		float specular = pow(abs(specular_angle), specular_power);
 		color += visibility * shininess * specular * u_dir_light_color;
 	}
 
@@ -122,16 +122,7 @@ void main()
 	color += shininess * indirect_specular_light;
 
 	//////////////////////////////////////////////////////////
-	
+
 	o_color = vec4(color, 1.0);
-/*
-	for (int i = 0; i < 9999999; i++)
-	{
-		o_color.rgb += vec3(
-			pow(sin(float(i)), 999.0 - float(i)),
-			pow(cos(float(i)), 9999.0 - float(i) * 2.0),
-			1.0 / (tan(float(i)) + 1.0)
-		);
-	}
-*/
+
 }

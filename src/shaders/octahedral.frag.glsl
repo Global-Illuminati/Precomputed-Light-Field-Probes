@@ -9,8 +9,8 @@ in vec2 v_tex_coord;
 uniform samplerCube u_radiance_distance_cubemap;
 uniform samplerCube u_normals_cubemap;
 
-layout(location = 0) out vec4 o_radiance;
-layout(location = 1) out vec4 o_distance;
+layout(location = 0) out vec4 o_distance;
+layout(location = 1) out vec4 o_radiance;
 layout(location = 2) out vec4 o_normals;
 
 void main()

@@ -81,8 +81,8 @@ void main()
 
 		// specular
 		float specular_angle = saturate(dot(N, wh));
-		float specular_power = pow(2.0, 13.0 * shininess); // (fake glossiness from the specular map)
-		float specular = pow(specular_angle, specular_power);
+		float specular_power = pow(abs(2.0), 13.0 * shininess); // (fake glossiness from the specular map)
+		float specular = pow(abs(specular_angle), specular_power);
 		color += visibility * shininess * specular * u_dir_light_color;
 	}
 
