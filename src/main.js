@@ -268,7 +268,9 @@ function init() {
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
 		.texture('u_environment_map', loadTexture('environments/ocean.jpg', {
 			minFilter: PicoGL.NEAREST,
-			magFilter: PicoGL.NEAREST
+			magFilter: PicoGL.NEAREST,
+			wrapS: PicoGL.CLAMP_TO_EDGE,
+			wrapT: PicoGL.CLAMP_TO_EDGE
 		}));
 
 		var unlitShader = makeShader('unlit', data);
