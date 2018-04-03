@@ -1,7 +1,8 @@
 #version 300 es
+precision highp int;
 precision highp float;
-precision lowp sampler2D;
-precision lowp sampler2DArray;
+precision highp sampler2D;
+precision highp sampler2DArray;
 
 #include <common.glsl>
 

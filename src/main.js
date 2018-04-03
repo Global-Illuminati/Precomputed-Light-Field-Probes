@@ -283,11 +283,11 @@ function init() {
 
 		{
 			let m = mat4.create();
-			let r = quat.fromEuler(quat.create(), 0, -25, 0);
+			let r = quat.fromEuler(quat.create(), 0, 35, 0);
 			let t = vec3.fromValues(-15, 4, -4);
 			let s = vec3.fromValues(3, 3, 3);
 			mat4.fromRotationTranslationScale(m, r, t, s);
-			loadObject('cube/', 'cube.obj', 'test.mtl', m);
+			loadObject('quad/', 'quad.obj', 'quad.mtl', m);
 		}
 
 		setupProbes(1024, 1024);
