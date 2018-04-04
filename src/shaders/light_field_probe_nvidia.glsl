@@ -97,8 +97,8 @@ GridCoord probeIndexToGridCoord(in LightFieldSurface L, ProbeIndex index) {
     iPos.y = (index & ((L.probeCounts.x * L.probeCounts.y) - 1)) >> findMSB(L.probeCounts.x);
     iPos.z = index >> findMSB(L.probeCounts.x * L.probeCounts.y);
 
-    //return iPos;
-    return ivec3(0, 0, 0); // @Simplification
+    return iPos;
+    //return ivec3(0, 0, 0); // @Simplification
 }
 
 /** probeCoords Coordinates of the probe, computed as part of the process. */
@@ -136,8 +136,8 @@ CycleIndex nearestProbeIndices(in LightFieldSurface L, Point3 X) {
 
 
 Point3 gridCoordToPosition(in LightFieldSurface L, GridCoord c) {
-    //return L.probeStep * Vector3(c) + L.probeStartPosition;
-    return vec3(-10.0, 4.0, 0.0); // @Simplification
+    return L.probeStep * Vector3(c) + L.probeStartPosition;
+    //return vec3(-10.0, 4.0, 0.0); // @Simplification
 }
 
 
@@ -587,7 +587,7 @@ TraceResult traceOneRaySegment
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,
             // so we don't need to clamp to the segment length
 
-#if 1
+#if 0
             TraceResult result = highResolutionTraceOneRaySegment(lightFieldSurface, probeSpaceRay, texCoord, endTexCoord, probeIndex, tMin, tMax, hitProbeTexCoord);
 
             if (result != TRACE_RESULT_MISS) {
@@ -636,8 +636,8 @@ TraceResult traceOneProbeOct(in LightFieldSurface lightFieldSurface, in ProbeInd
     // How short of a ray segment is not worth tracing?
     const float degenerateEpsilon = 0.001; // meters
 
-    //Point3 probeOrigin = probeLocation(lightFieldSurface, index);
-    Point3 probeOrigin = Point3(-10.0, 4.0, 0.0);// @Simplification
+    Point3 probeOrigin = probeLocation(lightFieldSurface, index);
+    //Point3 probeOrigin = Point3(-10.0, 4.0, 0.0);// @Simplification
 
     Ray probeSpaceRay;
     probeSpaceRay.origin    = worldSpaceRay.origin - probeOrigin;
@@ -761,7 +761,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 	float hit_distance = 11000.0; // (clear/sky depth is 10000)
 	ProbeIndex hit_probe_index;
 	vec2 hit_tex_coord;
-
+/*
 	TraceResult result = trace_simple(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index);
 
     if (result == TRACE_RESULT_HIT)
@@ -777,6 +777,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
     {
         return vec3(0.0);//1.0, 0.0, 1.0);
     }
+*/
 /*
 	switch (result)
 	{
@@ -791,18 +792,17 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 			return vec3(1.0, 0.0, 1.0);
 	}
 */
-/*
-	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, true))
+
+	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, false))
 	{
 		// TODO: Missed scene, use some fallback method
 		return vec3(1.0, 0.0, 1.0);
 	}
 	else
 	{
-		// TODO: Texture Array - Sample into a texture array and use the probe_index
-		return textureLod(L.radianceProbeGrid, vec2(hit_tex_coord), 0.0).rgb;
+		return textureLod(L.radianceProbeGrid, vec3(hit_tex_coord, hit_probe_index), 0.0).rgb;
 	}
-*/
+
 }
 
 #endif // Header guard

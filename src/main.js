@@ -61,6 +61,10 @@ var probeLocations = [
 	vec3.fromValues(+10, 30, 0)
 ]
 
+var probeOrigin;
+var probeCount;
+var probeStep;
+
 var octahedralDrawCall;
 var octahedralFramebuffer;
 var octahedralFramebufferLow;
@@ -284,6 +288,8 @@ function init() {
 
 		var unlitShader = makeShader('unlit', data);
 		var probeVertexArray = createSphereVertexArray(0.08, 8, 8);
+
+		placeProbes();
 		setupProbeDrawCall(probeVertexArray, unlitShader);
 
 		defaultShader = makeShader('default', data);
@@ -456,6 +462,34 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 
 }
 
+function placeProbes() {
+
+	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
+	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
+	probeCount  = new Int32Array([4, 4, 4]);
+
+	var totalCount = probeCount[0] * probeCount[1] * probeCount[2];
+	probeLocations = new Array(totalCount);
+	var index = 0;
+
+	for (var z = 0; z < probeCount[2]; ++z) {
+		for (var y = 0; y < probeCount[1]; ++y) {
+			for (var x = 0; x < probeCount[0]; ++x) {
+
+				var location = vec3.create();
+				var diff = vec3.create();
+
+				vec3.mul(diff, vec3.fromValues(x, y, z), probeStep);
+				vec3.add(location, probeOrigin, diff);
+
+				probeLocations[index++] = location;
+
+			}
+		}
+	}
+
+}
+
 function setupProbeDrawCall(vertexArray, shader) {
 
 	if (probeLocations.length === 0) {
@@ -622,6 +656,8 @@ function render() {
 
 		}
 
+		//console.log(camera.position);
+
 	}
 	picoTimer.end();
 	stats.end();
@@ -718,9 +754,9 @@ function renderScene() {
 		.texture('L.normalProbeGrid', probeOctahedrals['normals'])
 		.texture('L.distanceProbeGrid', probeOctahedrals['distanceHigh'])
 		.texture('L.lowResolutionDistanceProbeGrid', probeOctahedrals['distanceLow'])
-		.uniform('L.probeCounts', new Int32Array([1, 1, 1]))
-		.uniform('L.probeStartPosition', probeLocations[0])
-		.uniform('L.probeStep', vec3.fromValues(1, 1, 1)) // TODO: Shouldn't matter for now
+		.uniform('L.probeCounts', probeCount)
+		.uniform('L.probeStartPosition', probeOrigin)
+		.uniform('L.probeStep', probeStep)
 		.uniform('L.lowResolutionDownsampleFactor', lowPrecisionSizeDownsample)
 
 		.draw();
