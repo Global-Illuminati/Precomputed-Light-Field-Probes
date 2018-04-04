@@ -38,10 +38,10 @@ uniform vec3 u_camera_position;
 
 uniform struct LightFieldSurface
 {
-	sampler2D/*Array*/      radianceProbeGrid;
-	sampler2D/*Array*/      normalProbeGrid;
-	sampler2D/*Array*/      distanceProbeGrid;
-	sampler2D/*Array*/      lowResolutionDistanceProbeGrid;
+	sampler2DArray          radianceProbeGrid;
+	sampler2DArray          normalProbeGrid;
+	sampler2DArray          distanceProbeGrid;
+	sampler2DArray          lowResolutionDistanceProbeGrid;
 	Vector3int32            probeCounts; // assumed to be a power of two!
 	Point3                  probeStartPosition;
 	Vector3                 probeStep;

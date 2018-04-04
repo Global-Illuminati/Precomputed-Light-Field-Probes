@@ -37,6 +37,7 @@ var precomputeShader;
 var shadowMapShader;
 
 var blitTextureDrawCall;
+var blitTextureArrayDrawCall;
 var blitCubemapDrawCall
 var environmentDrawCall;
 
@@ -53,6 +54,11 @@ var performPrecomputeThisFrame = false;
 var probeDrawCall;
 var probeLocations = [
 	vec3.fromValues(-10, 4, 0),
+	vec3.fromValues(+10, 4, 0),
+	vec3.fromValues(-10, 15, 0),
+	vec3.fromValues(+10, 15, 0),
+	vec3.fromValues(-10, 30, 0),
+	vec3.fromValues(+10, 30, 0)
 ]
 
 var octahedralDrawCall;
@@ -249,6 +255,7 @@ function init() {
 	shaderLoader.addShaderProgram('precompute', 'default.vert.glsl', 'precompute.frag.glsl');
 	shaderLoader.addShaderProgram('environment', 'environment.vert.glsl', 'environment.frag.glsl');
 	shaderLoader.addShaderProgram('textureBlit', 'screen_space.vert.glsl', 'texture_blit.frag.glsl');
+	shaderLoader.addShaderProgram('textureArrayBlit', 'screen_space.vert.glsl', 'texture_array_blit.frag.glsl');
 	shaderLoader.addShaderProgram('cubemapBlit', 'screen_space.vert.glsl', 'cubemap_blit.frag.glsl');
 	shaderLoader.addShaderProgram('shadowMapping', 'shadow_mapping.vert.glsl', 'shadow_mapping.frag.glsl');
 	shaderLoader.addShaderProgram('octahedralMap', 'screen_space.vert.glsl', 'octahedral.frag.glsl');
@@ -258,6 +265,8 @@ function init() {
 
 		var textureBlitShader = makeShader('textureBlit', data);
 		blitTextureDrawCall = app.createDrawCall(textureBlitShader, fullscreenVertexArray);
+		var textureArrayBlitShader = makeShader('textureArrayBlit', data);
+		blitTextureArrayDrawCall = app.createDrawCall(textureArrayBlitShader, fullscreenVertexArray);
 		var cubemapBlitShader = makeShader('cubemapBlit', data);
 		blitCubemapDrawCall = app.createDrawCall(cubemapBlitShader, fullscreenVertexArray);
 
@@ -518,7 +527,9 @@ function setupProbes(cubemapSize, octahedralSize) {
 	// NOTE: Formats below taken from the paper!
 	//
 
-	probeOctahedrals['radiance'] = app.createTexture2D(octahedralSize, octahedralSize, {
+	var numProbes = probeLocations.length;
+
+	probeOctahedrals['radiance'] = app.createTextureArray(octahedralSize, octahedralSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGB,
 		internalFormat: PicoGL.R11F_G11F_B10F,
@@ -527,7 +538,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 	});
 
 	// TODO: Probably encode normals as RG8 instead to compress it a bit (like in the paper). We don't need much precision anyway...
-	probeOctahedrals['normals'] = app.createTexture2D(octahedralSize, octahedralSize, {
+	probeOctahedrals['normals'] = app.createTextureArray(octahedralSize, octahedralSize, numProbes, {
 		type: PicoGL.UNSIGNED_BYTE,
 		format: PicoGL.RGB,
 		internalFormat: PicoGL.RGB8,
@@ -535,7 +546,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 		magFilter: PicoGL.NEAREST
 	});
 
-	probeOctahedrals['distanceHigh'] = app.createTexture2D(octahedralSize, octahedralSize, {
+	probeOctahedrals['distanceHigh'] = app.createTextureArray(octahedralSize, octahedralSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RED,
 		internalFormat: PicoGL.R16F,
@@ -543,7 +554,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 		magFilter: PicoGL.NEAREST
 	});
 
-	probeOctahedrals['distanceLow'] = app.createTexture2D(lowSize, lowSize, {
+	probeOctahedrals['distanceLow'] = app.createTextureArray(lowSize, lowSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RED,
 		internalFormat: PicoGL.R16F,
@@ -582,10 +593,7 @@ function render() {
 
 			let start = new Date().getTime();
 
-			renderProbeCubemaps();
-			octahedralProjectProbeCubemaps();
-			app.gl.flush();
-			app.gl.finish(); // NOTE!
+			precompute();
 
 			let end = new Date().getTime();
 			let timePassed = end - start;
@@ -595,20 +603,22 @@ function render() {
 
 		}
 
-		renderScene();
-
-		var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
-		renderProbeLocations(viewProjection);
-
-		var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
-		renderEnvironment(inverseViewProjection)
-
 		if (settings.do_debug_show_probe) {
 
-			// TODO: Take probe index!
 			var name = settings.debug_show_probe_map;
+			var layer = settings.debug_show_probe_index;
 			var isDepthMap = name.indexOf('distance') != -1;
-			renderTextureToScreen(probeOctahedrals[name], isDepthMap);
+			renderTextureArrayToScreen(probeOctahedrals[name], layer, isDepthMap);
+
+		} else {
+
+			renderScene();
+
+			var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
+			renderProbeLocations(viewProjection);
+
+			var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
+			renderEnvironment(inverseViewProjection)
 
 		}
 
@@ -757,17 +767,22 @@ function renderEnvironment(inverseViewProjection) {
 
 }
 
-function renderProbeCubemaps() {
+function precompute() {
 
-	if (!probeRenderingFramebuffer) {
-		return;
+	for (var i = 0, len = probeLocations.length; i < len; ++i) {
+		precomputeProbe(i, probeLocations[i])
 	}
+
+}
+
+function precomputeProbe(index, location) {
+
+	//
+	// Render probe cubemaps
+	//
 
 	var projectionMatrix = mat4.create();
 	mat4.perspective(projectionMatrix, Math.PI / 2.0, 1.0, 0.1, 100.0);
-
-	// TODO: Maybe pass in a specific probe and render cubemap from that one.
-	var cameraPosition = probeLocations[0];
 
 	var CUBE_LOOK_DIR = [
 		vec3.fromValues(1.0, 0.0, 0.0),
@@ -790,8 +805,8 @@ function renderProbeCubemaps() {
 	for (var side = 0; side < 6; side++) {
 
 		var viewMatrix = mat4.create();
-		var lookPos = vec3.add(vec3.create(), cameraPosition, CUBE_LOOK_DIR[side]);
-		mat4.lookAt(viewMatrix, cameraPosition, lookPos, CUBE_LOOK_UP[side]);
+		var lookPos = vec3.add(vec3.create(), location, CUBE_LOOK_DIR[side]);
+		mat4.lookAt(viewMatrix, location, lookPos, CUBE_LOOK_UP[side]);
 
 		var sideTarget = PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X + side;
 		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance_distance'], sideTarget);
@@ -837,10 +852,6 @@ function renderProbeCubemaps() {
 
 		}
 
-		probeDrawCall
-		.uniform('u_projection_from_world', lightViewProjection)
-		.draw();
-
 		var inverseViewProjection = mat4.create();
 		mat4.mul(inverseViewProjection, projectionMatrix, viewMatrix);
 		mat4.invert(inverseViewProjection, inverseViewProjection);
@@ -858,21 +869,17 @@ function renderProbeCubemaps() {
 		}
 	}
 
-}
+	//
+	// Project cubemaps to octahedrals
+	//
 
-function octahedralProjectProbeCubemaps() {
-
-	if (!octahedralDrawCall) {
-		return;
-	}
-
-	octahedralFramebuffer.colorTarget(0, probeOctahedrals['distanceHigh']);
-	octahedralFramebuffer.colorTarget(1, probeOctahedrals['radiance']);
-	octahedralFramebuffer.colorTarget(2, probeOctahedrals['normals']);
+	octahedralFramebuffer.colorTarget(0, probeOctahedrals['distanceHigh'], index);
+	octahedralFramebuffer.colorTarget(1, probeOctahedrals['radiance'], index);
+	octahedralFramebuffer.colorTarget(2, probeOctahedrals['normals'], index);
 
 	validateFramebuffer(octahedralFramebuffer); // NOTE!
 
-	octahedralFramebufferLow.colorTarget(0, probeOctahedrals['distanceLow']);
+	octahedralFramebufferLow.colorTarget(0, probeOctahedrals['distanceLow'], index);
 
 	validateFramebuffer(octahedralFramebufferLow); // NOTE!
 
@@ -889,6 +896,13 @@ function octahedralProjectProbeCubemaps() {
 	app.drawFramebuffer(octahedralFramebufferLow)
 	.viewport(0, 0, probeOctahedralSizeLow, probeOctahedralSizeLow);
 	octahedralDrawCall.draw();
+
+	//
+	// TODO: Prefilter irradiance etc.
+	//
+
+	// ...
+
 }
 
 function renderTextureToScreen(texture, isDepthMap) {
@@ -912,6 +926,25 @@ function renderTextureToScreen(texture, isDepthMap) {
 
 	blitTextureDrawCall
 	.texture('u_texture', texture)
+	.uniform('u_is_depth_map', isDepthMap || false)
+	.draw();
+
+}
+
+function renderTextureArrayToScreen(texture, layer, isDepthMap) {
+
+	if (!blitTextureArrayDrawCall) {
+		return;
+	}
+
+	app.defaultDrawFramebuffer()
+	.defaultViewport()
+	.noDepthTest()
+	.noBlend();
+
+	blitTextureArrayDrawCall
+	.texture('u_texture', texture)
+	.uniform('u_layer', layer)
 	.uniform('u_is_depth_map', isDepthMap || false)
 	.draw();
 
