@@ -374,7 +374,11 @@ TraceResult highResolutionTraceOneRaySegment
             //vec3 normal = octDecode(texelFetch(lightFieldSurface.normalProbeGrid, ivec3(lightFieldSurface.distanceProbeGrid.size.xy * texCoord, probeIndex), 0).xy * lightFieldSurface.normalProbeGrid.readMultiplyFirst.xy + lightFieldSurface.normalProbeGrid.readAddSecond.xy);
             vec3 packedNormal = texelFetch(lightFieldSurface.normalProbeGrid,
                 ivec2(/*size(lightFieldSurface.normalProbeGrid)*/ TEX_SIZE * texCoord), 0).rgb;
-            vec3 normal = unpackNormal(packedNormal);
+            //vec3 normal = unpackNormal(packedNormal);
+            vec3 normal = vec3(0.0);
+            if (lengthSquared(packedNormal) > 0.0001) {
+                normal = unpackNormal(packedNormal);
+            }
 
             // Only extrude towards and away from the view ray, not perpendicular to it
             // Don't allow extrusion TOWARDS the viewer, only away
