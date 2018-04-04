@@ -81,6 +81,12 @@ var probeRenderingFramebuffer;
 var probeCubemaps = {};
 var probeCubeSize;
 
+var irradianceDrawCall;
+var irradianceFramebuffer;
+var irradianceSize = 128;
+//filtered distance, squared distance as well..
+var irradianceOctahedrals;
+
 window.addEventListener('DOMContentLoaded', function () {
 
 	init();
@@ -263,6 +269,7 @@ function init() {
 	shaderLoader.addShaderProgram('cubemapBlit', 'screen_space.vert.glsl', 'cubemap_blit.frag.glsl');
 	shaderLoader.addShaderProgram('shadowMapping', 'shadow_mapping.vert.glsl', 'shadow_mapping.frag.glsl');
 	shaderLoader.addShaderProgram('octahedralMap', 'screen_space.vert.glsl', 'octahedral.frag.glsl');
+	shaderLoader.addShaderProgram('irradianceMap', 'screen_space.vert.glsl', 'irradiance.frag.glsl');
 	shaderLoader.load(function(data) {
 
 		var fullscreenVertexArray = createFullscreenVertexArray();
@@ -276,6 +283,9 @@ function init() {
 
 		var octahedralShader = makeShader('octahedralMap', data);
 		octahedralDrawCall = app.createDrawCall(octahedralShader, fullscreenVertexArray);
+
+		var irradianceShader = makeShader('irradianceMap', data);
+		irradianceDrawCall = app.createDrawCall(irradianceShader, fullscreenVertexArray);
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
@@ -939,6 +949,23 @@ function precomputeProbe(index, location) {
 
 	// ...
 
+}
+
+function createIrradianceMap() {
+
+	if(!irradianceDrawCall) return;
+
+	irradianceFramebuffer.colorTarget(0, irradianceOctahedrals);
+	validateFramebuffer(irradianceFramebuffer);
+
+	app.noDepthTest().noBlend().
+
+	irradianceDrawCall
+	.texture('u_radiance_octahedral', probeOctahedrals['radiance']);
+
+	app.drawFramebuffer(irradianceFramebuffer)
+	.viewport(0, 0, irradianceSize, irradianceSize);
+	irradianceDrawCall.draw();
 }
 
 function renderTextureToScreen(texture, isDepthMap) {
