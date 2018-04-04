@@ -131,7 +131,7 @@ int findMSB(highp int val)
 		val &= ~(1 << 31);
 	}
 
-	int pos = 0;
+	int pos = -1;
 	while (val != 0) {
 		pos += 1;
 		val = val >> 1;
