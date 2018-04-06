@@ -17,7 +17,7 @@ var settings = {
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
 	debug_show_probe_map: 'radiance',
-	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals']
+	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance']
 };
 
 var sceneSettings = {
@@ -74,7 +74,8 @@ var probeOctahedrals = {
 	radiance: null,
 	distanceLow: null,
 	distanceHigh: null,
-	normals: null
+	normals: null,
+	irradiance: null
 };
 
 var probeRenderingFramebuffer;
@@ -85,7 +86,6 @@ var irradianceDrawCall;
 var irradianceFramebuffer;
 var irradianceSize = 128;
 //filtered distance, squared distance as well..
-var irradianceOctahedrals;
 
 window.addEventListener('DOMContentLoaded', function () {
 
@@ -606,6 +606,15 @@ function setupProbes(cubemapSize, octahedralSize) {
 		magFilter: PicoGL.NEAREST
 	});
 
+	irradianceFramebuffer = app.createFramebuffer();
+	probeOctahedrals['irradiance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
+		type: PicoGL.FLOAT,
+		format: PicoGL.RGB,
+		internalFormat: PicoGL.R11F_G11F_B10F,
+		minFilter: PicoGL.NEAREST,
+		magFilter: PicoGL.NEAREST
+	});
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -948,14 +957,15 @@ function precomputeProbe(index, location) {
 	//
 
 	// ...
+	createIrradianceMap(index);
 
 }
 
-function createIrradianceMap() {
+function createIrradianceMap(index) {
 
 	if(!irradianceDrawCall) return;
 
-	irradianceFramebuffer.colorTarget(0, irradianceOctahedrals);
+	irradianceFramebuffer.colorTarget(0, probeOctahedrals['irradiance'], index);
 	validateFramebuffer(irradianceFramebuffer);
 
 	app.noDepthTest().noBlend().
