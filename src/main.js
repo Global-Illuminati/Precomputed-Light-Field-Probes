@@ -957,7 +957,7 @@ function precomputeProbe(index, location) {
 	//
 
 	// ...
-	createIrradianceMap(index);
+	//createIrradianceMap(index);
 
 }
 
@@ -971,11 +971,13 @@ function createIrradianceMap(index) {
 	app.noDepthTest().noBlend().
 
 	irradianceDrawCall
-	.texture('u_radiance_octahedral', probeOctahedrals['radiance']);
+	.texture('u_radiance_octahedral', probeOctahedrals['radiance']) //uncaught type error..
+	.uniform('u_layer', index);
 
 	app.drawFramebuffer(irradianceFramebuffer)
 	.viewport(0, 0, irradianceSize, irradianceSize);
 	irradianceDrawCall.draw();
+
 }
 
 function renderTextureToScreen(texture, isDepthMap) {
