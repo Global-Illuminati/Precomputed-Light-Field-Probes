@@ -204,23 +204,6 @@ void sort(inout vec3 v) {
     minSwap(v[0], v[1]);
 }
 
-vec3 sortFailsafeAndStupid(in vec3 v)
-{
-    float lowest  = min(min(v.x, v.y), min(v.y, v.z));
-    float highest = max(max(v.x, v.y), max(v.y, v.z));
-
-    bool xRep = v.x == lowest || v.x == highest;
-    bool yRep = v.y == lowest || v.y == highest;
-    bool zRep = v.z == lowest || v.z == highest;
-
-    float middle;
-    if      (!xRep) middle = v.x;
-    else if (!yRep) middle = v.y;
-    else if (!zRep) middle = v.z;
-
-    return vec3(lowest, middle, highest);
-}
-
 
 /** Segments a ray into the piecewise-continuous rays or line segments that each lie within
     one Euclidean octant, which correspond to piecewise-linear projections in octahedral space.
@@ -247,14 +230,6 @@ void computeRaySegments
     Vector3 t = origin * -directionFrac;
     sort(t);
 
-/*
-    t = sortFailsafeAndStupid(t); // @Simplification
-    float diff = tMax - tMin;
-    float step = diff / 5.0;
-    for (int i = 0; i < 3; ++i) {
-        boundaryTs[i + 1] = tMin + (step + 1.0);
-    }
-*/
     // Copy the values into the interval boundaries.
     // This loop expands at compile time and eliminates the
     // relative indexing, so it is just three conditional move operations
@@ -305,7 +280,14 @@ TraceResult highResolutionTraceOneRaySegment
 
     Vector2 texCoordDelta        = endTexCoord - startTexCoord;
     float texCoordDistance       = length(texCoordDelta);
-    Vector2 texCoordDirection    = texCoordDelta * (1.0 / texCoordDistance);
+
+    // end and start texCoord identical or very close, so we can't really say much about this... Really though
+    // we should do a trace on this texel and then no more so we don't miss out on the possibility of a hit on it.
+    if (texCoordDistance < 0.001) {
+        return TRACE_RESULT_UNKNOWN;
+    }
+
+    Vector2 texCoordDirection = texCoordDelta * (1.0 / texCoordDistance);
 
     float texCoordStep = /*invSize(lightFieldSurface.distanceProbeGrid)*/INV_TEX_SIZE.x * (texCoordDistance / maxComponent(abs(texCoordDelta)));
 
@@ -334,7 +316,6 @@ TraceResult highResolutionTraceOneRaySegment
     }
 
     for (float d = 0.0f; d <= texCoordDistance; d += texCoordStep) {
-    //for (float d = 0.0; d <= 0.0; d += texCoordStep) { // For testing if the loop is the reason of the crash!
         Point2 texCoord = (texCoordDirection * min(d + texCoordStep * 0.5, texCoordDistance)) + startTexCoord;
 
         // Fetch the probe data
@@ -586,20 +567,13 @@ TraceResult traceOneRaySegment
 
             // The low-resolution trace already guaranted that endTexCoord is no farther along the ray than segmentEndTexCoord if this point is reached,
             // so we don't need to clamp to the segment length
-
-#if 0
             TraceResult result = highResolutionTraceOneRaySegment(lightFieldSurface, probeSpaceRay, texCoord, endTexCoord, probeIndex, tMin, tMax, hitProbeTexCoord);
 
             if (result != TRACE_RESULT_MISS) {
                 // High-resolution hit or went behind something, which must be the result for the whole segment trace
                 return result;
             }
-#else
 
-            // Low res hit assumed to be okay @Simplification
-            hitProbeTexCoord = endTexCoord;
-            return TRACE_RESULT_HIT;
-#endif
         } // else...continue the outer loop; we conservatively refined and didn't actually find a hit
 
         // Recompute each time around the loop to avoid increasing the peak register count
@@ -652,7 +626,7 @@ TraceResult traceOneProbeOct(in LightFieldSurface lightFieldSurface, in ProbeInd
     for (int i = 0; i < 4; ++i) {
         if (abs(boundaryTs[i] - boundaryTs[i + 1]) >= degenerateEpsilon) {
             TraceResult result = traceOneRaySegment(lightFieldSurface, probeSpaceRay, boundaryTs[i], boundaryTs[i + 1], index, tMin, tMax, hitProbeTexCoord);
-#if 1
+
             if (result == TRACE_RESULT_HIT)
             {
                 // Hit!
@@ -664,17 +638,7 @@ TraceResult traceOneProbeOct(in LightFieldSurface lightFieldSurface, in ProbeInd
                 // Failed to find anything conclusive
                 return TRACE_RESULT_UNKNOWN;
             }
-#else
-            switch (result) {
-            case TRACE_RESULT_HIT:
-                // Hit!
-                return TRACE_RESULT_HIT;
 
-            case TRACE_RESULT_UNKNOWN:
-                // Failed to find anything conclusive
-                return TRACE_RESULT_UNKNOWN;
-            } // switch
-#endif
         } // if
     } // For each segment
 
@@ -733,67 +697,77 @@ bool trace(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float t
     return (hitProbeIndex != -1);
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// "Utility" (TODO: maybe move these functions to the main shader?)
-
-/**
- Trace a single probe and return result as is
- */
-TraceResult trace_simple(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float tMax, out Point2 hitProbeTexCoord, out ProbeIndex hitProbeIndex) {
+TraceResult trace_alt(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, inout float tMax, out Point2 hitProbeTexCoord, out ProbeIndex hitProbeIndex) {
 
     hitProbeIndex = -1;
-    float tMin = 0.0; // TODO: Adjust?!
     ProbeIndex baseIndex = 0;
 
-    TraceResult result = traceOneProbeOct(lightFieldSurface, relativeProbeIndex(lightFieldSurface, baseIndex, 0),
+    int i = nearestProbeIndices(lightFieldSurface, worldSpaceRay.origin);
+    int probesLeft = 8;
+    float tMin = 0.0;
+    while (probesLeft > 0) {
+        TraceResult result = traceOneProbeOct(lightFieldSurface, relativeProbeIndex(lightFieldSurface, baseIndex, i),
             worldSpaceRay, tMin, tMax, hitProbeTexCoord);
 
-    return result;
+        if (result == TRACE_RESULT_UNKNOWN) {
+
+            i = nextCycleIndex(i);
+            --probesLeft;
+
+        } else if (result == TRACE_RESULT_HIT) {
+
+            hitProbeIndex = relativeProbeIndex(lightFieldSurface, baseIndex, i);
+            return TRACE_RESULT_HIT;
+
+        } else if (result == TRACE_RESULT_MISS) {
+
+            return TRACE_RESULT_MISS;
+
+        }
+    }
+
+    return TRACE_RESULT_UNKNOWN;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// "Utility" (TODO: maybe move these functions to the main shader?)
 
 vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3 normal)
 {
 	// TODO: Don't assume perfect mirror!!!
 	vec3 wi = normalize(reflect(-wo, normal));
-	vec3 origin = world_space_pos + 0.1 * normal + 0.25 * wi; // TODO: Remove the 0.2 * N when successfully doing high-res tracing
+	vec3 origin = world_space_pos + 0.25 * wi;
 	Ray world_space_ray = makeRay(origin, wi);
 
-	float hit_distance = 11000.0; // (clear/sky depth is 10000)
+	float hit_distance = 1000.0; // (clear/sky depth is 10000)
 	ProbeIndex hit_probe_index;
 	vec2 hit_tex_coord;
-/*
-	TraceResult result = trace_simple(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index);
 
+#define USE_ALT 1
+
+#if USE_ALT
+
+	TraceResult result = trace_alt(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index);
     if (result == TRACE_RESULT_HIT)
     {
         return textureLod(L.radianceProbeGrid, vec3(hit_tex_coord, hit_probe_index), 0.0).rgb;
     }
     else if (result == TRACE_RESULT_MISS)
     {
-        // TODO: Sample from environment!
-        return vec3(0.0, 0.0, 1.0);
+        // Missed all scene geometry so sample from environment
+        vec2 envUV = spherical_from_direction(wi);
+        return texture(u_environment_map, envUV).rgb;
+        //return vec3(0.0, 0.0, 1.0);
     }
     else if (result == TRACE_RESULT_UNKNOWN)
     {
-        return vec3(0.0);//1.0, 0.0, 1.0);
+        return vec3(1.0, 0.0, 1.0);
     }
-*/
-/*
-	switch (result)
-	{
-		case TRACE_RESULT_HIT:
-			return textureLod(L.radianceProbeGrid, vec2(hit_tex_coord), 0.0).rgb;
 
-		case TRACE_RESULT_MISS:
-			// TODO: Sample from environment!
-			return vec3(0.0, 0.0, 1.0);
+#else
 
-		case TRACE_RESULT_UNKNOWN:
-			return vec3(1.0, 0.0, 1.0);
-	}
-*/
-
-	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, false))
+    const bool fill_holes = true;
+	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, fill_holes))
 	{
 		// TODO: Missed scene, use some fallback method
 		return vec3(1.0, 0.0, 1.0);
@@ -803,6 +777,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 		return textureLod(L.radianceProbeGrid, vec3(hit_tex_coord, hit_probe_index), 0.0).rgb;
 	}
 
+#endif // USE_ALT
 }
 
 #endif // Header guard

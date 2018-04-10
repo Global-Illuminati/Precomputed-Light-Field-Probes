@@ -41,7 +41,9 @@ var shadowMapShader;
 var blitTextureDrawCall;
 var blitTextureArrayDrawCall;
 var blitCubemapDrawCall
+
 var environmentDrawCall;
+var environmentMap;
 
 var sceneUniforms;
 
@@ -251,6 +253,13 @@ function init() {
 	directionalLight = new DirectionalLight();
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
+	environmentMap = loadTexture('environments/ocean.jpg', {
+		minFilter: PicoGL.NEAREST,
+		magFilter: PicoGL.NEAREST,
+		wrapS: PicoGL.CLAMP_TO_EDGE,
+		wrapT: PicoGL.CLAMP_TO_EDGE
+	});
+
 	setupSceneUniforms();
 
 	var shaderLoader = new ShaderLoader('src/shaders/');
@@ -289,12 +298,7 @@ function init() {
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
-		.texture('u_environment_map', loadTexture('environments/ocean.jpg', {
-			minFilter: PicoGL.NEAREST,
-			magFilter: PicoGL.NEAREST,
-			wrapS: PicoGL.CLAMP_TO_EDGE,
-			wrapT: PicoGL.CLAMP_TO_EDGE
-		}));
+		.texture('u_environment_map', environmentMap);
 
 		var unlitShader = makeShader('unlit', data);
 		var probeVertexArray = createSphereVertexArray(0.08, 8, 8);
@@ -809,6 +813,7 @@ function renderScene() {
 		.uniform('u_dir_light_view_direction', dirLightViewDirection)
 		.uniform('u_light_projection_from_world', lightViewProjection)
 		.texture('u_shadow_map', shadowMap)
+		.texture('u_environment_map', environmentMap)
 
 		// GI uniforms
 		.texture('L.radianceProbeGrid', probeOctahedrals['radiance'])
