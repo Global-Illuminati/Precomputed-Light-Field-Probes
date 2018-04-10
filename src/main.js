@@ -1,7 +1,6 @@
 'using strict';
 
 function validateFramebuffer(framebuffer) {
-	framebuffer.gl.finish();
 	console.assert(framebuffer.getStatus() === PicoGL.FRAMEBUFFER_COMPLETE, "Framebuffer is not complete!");
 }
 
@@ -17,7 +16,10 @@ var settings = {
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
 	debug_show_probe_map: 'radiance',
-	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance']
+	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance'],
+
+	irradiance_num_samples: 512,
+	irradiance_lobe_size: 0.99
 };
 
 var sceneSettings = {
@@ -52,14 +54,7 @@ var meshes = [];
 var performPrecomputeThisFrame = false;
 
 var probeDrawCall;
-var probeLocations = [
-	vec3.fromValues(-10, 4, 0),
-	vec3.fromValues(+10, 4, 0),
-	vec3.fromValues(-10, 15, 0),
-	vec3.fromValues(+10, 15, 0),
-	vec3.fromValues(-10, 30, 0),
-	vec3.fromValues(+10, 30, 0)
-]
+var probeLocations;
 
 var probeOrigin;
 var probeCount;
@@ -84,7 +79,7 @@ var probeCubeSize;
 
 var irradianceDrawCall;
 var irradianceFramebuffer;
-var irradianceSize = 128;
+var irradianceSize = 256;
 //filtered distance, squared distance as well..
 
 window.addEventListener('DOMContentLoaded', function () {
@@ -121,9 +116,9 @@ function loadTexture(imageName, options) {
 	if (!options) {
 
 		var options = {};
-		options['minFilter'] = PicoGL.NEAREST;//LINEAR_MIPMAP_NEAREST;
-		options['magFilter'] = PicoGL.NEAREST;//LINEAR;
-		options['mipmaps'] = false;//true;
+		options['minFilter'] = PicoGL.LINEAR_MIPMAP_NEAREST;
+		options['magFilter'] = PicoGL.LINEAR;
+		options['mipmaps'] = true;
 
 	}
 
@@ -224,9 +219,13 @@ function init() {
 	var probe = gui.addFolder('Probe stuff');
 	probe.add({ f: function() { performPrecomputeThisFrame = true }}, 'f').name('Precompute');
 	probe.add(settings, 'do_debug_show_probe').name('Show probe');
-	probe.add(settings, 'debug_show_probe_index').name('... probe index');
+	probe.add(settings, 'debug_show_probe_index', 0, 64).name('... probe index');
 	probe.add(settings, 'debug_show_probe_map', settings.debug_show_probe_map_options).name('... texture');
 	probe.open();
+
+	var irradiance = probe.addFolder('Irradiance');
+	irradiance.add(settings, 'irradiance_num_samples', 1, 1024).name('Num samples');
+	irradiance.add(settings, 'irradiance_lobe_size', 0.0, 1.0).name('Cos lobe size');
 
 	window.addEventListener('keydown', function(e) {
 		if (e.keyCode == 80 /* p(recompute) */) performPrecomputeThisFrame = true;
@@ -286,6 +285,7 @@ function init() {
 
 		var irradianceShader = makeShader('irradianceMap', data);
 		irradianceDrawCall = app.createDrawCall(irradianceShader, fullscreenVertexArray);
+		irradianceDrawCall.uniformBlock('SphereSamples', createSpherSamplesUniformBuffer());
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
@@ -455,6 +455,52 @@ function setupSceneUniforms() {
 
 }
 
+function createPointsInSphere(count) {
+
+	var size = count * 3;
+	var points = new Float32Array(size);
+
+	for (var i = 0; i < count; ++i) {
+
+		var x, y, z;
+		do {
+			x = Math.random() * 2.0 - 1.0;
+			y = Math.random() * 2.0 - 1.0;
+			z = Math.random() * 2.0 - 1.0;
+		} while (x*x + y*y + z*z >= 1.0);
+
+		points[3 * i + 0] = x;
+		points[3 * i + 1] = y;
+		points[3 * i + 2] = z;
+	}
+
+	return points;
+}
+
+function createSpherSamplesUniformBuffer() {
+
+	// Make sure this matches the value in the shader!
+	var size = 1024;
+
+	var description = new Array(size).fill(PicoGL.FLOAT_VEC4);
+	var uniformBuffer = app.createUniformBuffer(description);
+
+	var samples = createPointsInSphere(size);
+
+	for (var i = 0; i < size; ++i) {
+		var sample = vec4.fromValues(
+			samples[3 * i + 0],
+			samples[3 * i + 1],
+			samples[3 * i + 2],
+			0.0
+		);
+		uniformBuffer.set(i, sample);
+	}
+
+	uniformBuffer.update();
+	return uniformBuffer;
+}
+
 function createVertexArrayFromMeshInfo(meshInfo) {
 
 	var positions = app.createVertexBuffer(PicoGL.FLOAT, 3, meshInfo.positions);
@@ -606,13 +652,14 @@ function setupProbes(cubemapSize, octahedralSize) {
 		magFilter: PicoGL.NEAREST
 	});
 
+	// Currently not an octahedral but actually a sphere-map (for spacial coherency & linear sampling)
 	irradianceFramebuffer = app.createFramebuffer();
 	probeOctahedrals['irradiance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGB,
 		internalFormat: PicoGL.R11F_G11F_B10F,
-		minFilter: PicoGL.NEAREST,
-		magFilter: PicoGL.NEAREST
+		minFilter: PicoGL.LINEAR,
+		magFilter: PicoGL.LINEAR
 	});
 
 }
@@ -675,8 +722,6 @@ function render() {
 
 		}
 
-		//console.log(camera.position);
-
 	}
 	picoTimer.end();
 	stats.end();
@@ -684,9 +729,6 @@ function render() {
 	if (picoTimer.ready()) {
 		gpuTimePanel.update(picoTimer.gpuTime, 35);
 	}
-
-	app.gl.flush();
-	app.gl.finish(); // NOTE!
 
 	requestAnimationFrame(render);
 }
@@ -825,16 +867,18 @@ function renderEnvironment(inverseViewProjection) {
 function precompute() {
 
 	for (var i = 0, len = probeLocations.length; i < len; ++i) {
-		precomputeProbe(i, probeLocations[i])
+		precomputeProbe(i)
 	}
 
 }
 
-function precomputeProbe(index, location) {
+function precomputeProbe(index) {
 
 	//
 	// Render probe cubemaps
 	//
+
+	var location = probeLocations[index];
 
 	var projectionMatrix = mat4.create();
 	mat4.perspective(projectionMatrix, Math.PI / 2.0, 1.0, 0.1, 100.0);
@@ -915,10 +959,14 @@ function precomputeProbe(index, location) {
 
 			app.depthFunc(PicoGL.EQUAL);
 
+			// Since we don't use HDR rendering on the main buffer, but sort of here, increase the brightness
+			// so that the environment appears brighter in reflections than in the sky (which would be/is saturated)
+			var brightness = settings.environment_brightness * 1.35;
+
 			environmentDrawCall
 			.uniform('u_camera_position', camera.position)
 			.uniform('u_world_from_projection', inverseViewProjection)
-			.uniform('u_environment_brightness', settings.environment_brightness)
+			.uniform('u_environment_brightness', brightness)
 			.draw();
 
 		}
@@ -953,10 +1001,9 @@ function precomputeProbe(index, location) {
 	octahedralDrawCall.draw();
 
 	//
-	// TODO: Prefilter irradiance etc.
+	// Prefilter irradiance etc.
 	//
 
-	// ...
 	createIrradianceMap(index);
 
 }
@@ -968,15 +1015,15 @@ function createIrradianceMap(index) {
 	irradianceFramebuffer.colorTarget(0, probeOctahedrals['irradiance'], index);
 	validateFramebuffer(irradianceFramebuffer);
 
-	app.noDepthTest().noBlend();
+	app.drawFramebuffer(irradianceFramebuffer)
+	.viewport(0, 0, irradianceSize, irradianceSize)
+	.noDepthTest().noBlend();
 
 	irradianceDrawCall
-	.texture('u_radiance_octahedral', probeOctahedrals['radiance']) //uncaught type error..
-	.uniform('u_layer', index);
-
-	app.drawFramebuffer(irradianceFramebuffer)
-	.viewport(0, 0, irradianceSize, irradianceSize);
-	irradianceDrawCall.draw();
+	.texture('u_radiance_cubemap', probeCubemaps['radiance_distance'])
+	.uniform('u_num_samples', settings.irradiance_num_samples)
+	.uniform('u_lobe_size', settings.irradiance_lobe_size)
+	.draw();
 
 }
 
