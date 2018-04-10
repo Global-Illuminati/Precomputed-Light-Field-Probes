@@ -957,7 +957,7 @@ function precomputeProbe(index, location) {
 	//
 
 	// ...
-	//createIrradianceMap(index);
+	createIrradianceMap(index);
 
 }
 
@@ -968,7 +968,7 @@ function createIrradianceMap(index) {
 	irradianceFramebuffer.colorTarget(0, probeOctahedrals['irradiance'], index);
 	validateFramebuffer(irradianceFramebuffer);
 
-	app.noDepthTest().noBlend().
+	app.noDepthTest().noBlend();
 
 	irradianceDrawCall
 	.texture('u_radiance_octahedral', probeOctahedrals['radiance']) //uncaught type error..
