@@ -528,6 +528,11 @@ function placeProbes() {
 	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
 	probeCount  = new Int32Array([4, 4, 4]);
 
+/*
+	probeOrigin = vec3.fromValues(-6.0, 1.5, -4.2);
+	probeStep   = vec3.fromValues(3.0, 3.0, 3.0);
+	probeCount  = new Int32Array([4, 4, 4]);
+*/
 	var totalCount = probeCount[0] * probeCount[1] * probeCount[2];
 	probeLocations = new Array(totalCount);
 	var index = 0;
