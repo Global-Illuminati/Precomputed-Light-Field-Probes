@@ -16,10 +16,11 @@ var settings = {
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
 	debug_show_probe_map: 'radiance',
-	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance'],
+	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance', 'filteredDistance'],
 
 	irradiance_num_samples: 512,
-	irradiance_lobe_size: 0.99
+	irradiance_lobe_size: 0.99,
+	filtered_distance_lobe_size: 0.08
 };
 
 var sceneSettings = {
@@ -229,6 +230,9 @@ function init() {
 	irradiance.add(settings, 'irradiance_num_samples', 1, 1024).name('Num samples');
 	irradiance.add(settings, 'irradiance_lobe_size', 0.0, 1.0).name('Cos lobe size');
 
+	var filteredDistance = probe.addFolder('Filtered distance');
+	filteredDistance.add(settings, 'filtered_distance_lobe_size', 0.0, 0.5).name('Cos lobe size');
+
 	window.addEventListener('keydown', function(e) {
 		if (e.keyCode == 80 /* p(recompute) */) performPrecomputeThisFrame = true;
 	});
@@ -243,7 +247,7 @@ function init() {
 	//////////////////////////////////////
 	// Camera stuff
 
-	var cameraPos = vec3.fromValues(-15, 3, 0);
+	var cameraPos = vec3.fromValues(0, 1.75, 2);
 	var cameraRot = quat.fromEuler(quat.create(), 15, -90, 0);
 	camera = new Camera(cameraPos, cameraRot);
 
@@ -310,6 +314,16 @@ function init() {
 		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
 
+		{
+			let m = mat4.create();
+			let r = quat.fromEuler(quat.create(), 0, 0, 0);
+			let t = vec3.fromValues(0, 0, 0);
+			let s = vec3.fromValues(1, 1, 1);
+			mat4.fromRotationTranslationScale(m, r, t, s);
+			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
+		}
+
+/*
 		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 
 		{
@@ -329,7 +343,7 @@ function init() {
 			mat4.fromRotationTranslationScale(m, r, t, s);
 			loadObject('quad/', 'quad.obj', 'quad.mtl', m);
 		}
-
+*/
 		setupProbes(1024, 1024);
 
 	});
@@ -529,10 +543,14 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 
 function placeProbes() {
 
+	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
+	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
+	probeCount  = new Int32Array([2, 2, 2]);
+/*
 	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
 	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
 	probeCount  = new Int32Array([4, 4, 4]);
-
+*/
 /*
 	probeOrigin = vec3.fromValues(-6.0, 1.5, -4.2);
 	probeStep   = vec3.fromValues(3.0, 3.0, 3.0);
@@ -594,7 +612,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 	// we get an optimal transfer to the octahedrals. Can definitely be optimized!
 	//
 
-	probeCubemaps['radiance_distance'] = app.createCubemap({
+	probeCubemaps['radiance'] = app.createCubemap({
 		width: cubemapSize,
 		height: cubemapSize,
 		type: PicoGL.FLOAT,
@@ -616,6 +634,14 @@ function setupProbes(cubemapSize, octahedralSize) {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGBA,
 		internalFormat: PicoGL.RGBA32F
+	});
+
+	probeCubemaps['distance'] = app.createCubemap({
+		width: cubemapSize,
+		height: cubemapSize,
+		type: PicoGL.FLOAT,
+		format: PicoGL.RG,
+		internalFormat: PicoGL.RG16F
 	});
 
 	// Octahedral stuff
@@ -666,12 +692,23 @@ function setupProbes(cubemapSize, octahedralSize) {
 		magFilter: PicoGL.NEAREST
 	});
 
-	// Currently not an octahedral but actually a sphere-map (for spacial coherency & linear sampling)
+	//
+	// Currently not octahedrals but actually a sphere-map (for spacial coherency & linear sampling)
+	//
+
 	irradianceFramebuffer = app.createFramebuffer();
 	probeOctahedrals['irradiance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGB,
 		internalFormat: PicoGL.R11F_G11F_B10F,
+		minFilter: PicoGL.LINEAR,
+		magFilter: PicoGL.LINEAR
+	});
+
+	probeOctahedrals['filteredDistance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
+		type: PicoGL.FLOAT,
+		format: PicoGL.RG,
+		internalFormat: PicoGL.RG16F,
 		minFilter: PicoGL.LINEAR,
 		magFilter: PicoGL.LINEAR
 	});
@@ -721,7 +758,7 @@ function render() {
 
 			var name = settings.debug_show_probe_map;
 			var layer = settings.debug_show_probe_index;
-			var isDepthMap = name.indexOf('distance') != -1;
+			var isDepthMap = name.indexOf('istance') != -1;
 			renderTextureArrayToScreen(probeOctahedrals[name], layer, isDepthMap);
 
 		} else {
@@ -923,8 +960,9 @@ function precomputeProbe(index) {
 		mat4.lookAt(viewMatrix, location, lookPos, CUBE_LOOK_UP[side]);
 
 		var sideTarget = PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X + side;
-		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance_distance'], sideTarget);
+		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance'], sideTarget);
 		probeRenderingFramebuffer.colorTarget(1, probeCubemaps['normals'], sideTarget);
+		probeRenderingFramebuffer.colorTarget(2, probeCubemaps['distance'], sideTarget);
 		probeRenderingFramebuffer.depthTarget(probeCubemaps['depth'], sideTarget);
 
 		validateFramebuffer(probeRenderingFramebuffer); // NOTE
@@ -1004,8 +1042,9 @@ function precomputeProbe(index) {
 	app.noDepthTest().noBlend();
 
 	octahedralDrawCall
-	.texture('u_radiance_distance_cubemap', probeCubemaps['radiance_distance'])
-	.texture('u_normals_cubemap', probeCubemaps['normals']);
+	.texture('u_radiance_cubemap', probeCubemaps['radiance'])
+	.texture('u_normals_cubemap', probeCubemaps['normals'])
+	.texture('u_distance_cubemap', probeCubemaps['distance']);
 
 	app.drawFramebuffer(octahedralFramebuffer)
 	.viewport(0, 0, probeOctahedralSize, probeOctahedralSize);
@@ -1016,14 +1055,8 @@ function precomputeProbe(index) {
 	octahedralDrawCall.draw();
 
 	//
-	// Prefilter irradiance etc.
+	// Prefilter irradiance
 	//
-
-	createIrradianceMap(index);
-
-}
-
-function createIrradianceMap(index) {
 
 	if(!irradianceDrawCall) return;
 
@@ -1035,9 +1068,26 @@ function createIrradianceMap(index) {
 	.noDepthTest().noBlend();
 
 	irradianceDrawCall
-	.texture('u_radiance_cubemap', probeCubemaps['radiance_distance'])
+	.texture('u_radiance_cubemap', probeCubemaps['radiance'])
 	.uniform('u_num_samples', settings.irradiance_num_samples)
 	.uniform('u_lobe_size', settings.irradiance_lobe_size)
+	.draw();
+
+	//
+	// Chebychev stuff (filter distances)
+	//
+
+	irradianceFramebuffer.colorTarget(0, probeOctahedrals['filteredDistance'], index);
+	validateFramebuffer(irradianceFramebuffer);
+
+	app.drawFramebuffer(irradianceFramebuffer)
+	.viewport(0, 0, irradianceSize, irradianceSize)
+	.noDepthTest().noBlend();
+
+	irradianceDrawCall
+	.texture('u_radiance_cubemap', probeCubemaps['distance'])
+	.uniform('u_num_samples', settings.irradiance_num_samples)
+	.uniform('u_lobe_size', settings.filtered_distance_lobe_size)
 	.draw();
 
 }

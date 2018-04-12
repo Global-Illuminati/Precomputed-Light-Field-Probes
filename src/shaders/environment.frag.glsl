@@ -12,6 +12,7 @@ uniform mat4 u_world_from_projection;
 uniform vec3 u_camera_position;
 
 layout(location = 0) out vec4 o_color;
+layout(location = 2) out vec4 o_distance;
 
 void main()
 {
@@ -26,8 +27,11 @@ void main()
 	vec3 color = texture(u_environment_map, uv).rgb;
 	color *= u_environment_brightness;
 
+	o_color = vec4(color, 0.0);
+
 	// NOTE: This will be clamped to 1.0 for normal framebuffers, but for the float distance texture that is used for
 	// the precompute step this will actually be 10000.0 which is the effectively inifinitely far away.
-	o_color = vec4(color, 10000.0);
+	float dist = 10000.0;
+	o_distance = vec4(dist, dist * dist, 0.0, 0.0);
 
 }

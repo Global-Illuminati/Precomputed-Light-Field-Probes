@@ -6,8 +6,9 @@ precision highp float;
 
 in vec2 v_tex_coord;
 
-uniform samplerCube u_radiance_distance_cubemap;
+uniform samplerCube u_radiance_cubemap;
 uniform samplerCube u_normals_cubemap;
+uniform samplerCube u_distance_cubemap;
 
 layout(location = 0) out vec4 o_distance;
 layout(location = 1) out vec4 o_radiance;
@@ -18,9 +19,8 @@ void main()
 	//vec3 direction = direction_from_spherical(v_tex_coord);
 	vec3 direction = octDecode(v_tex_coord * vec2(2.0) - vec2(1.0));
 
-	vec4 radiance_distance = texture(u_radiance_distance_cubemap, direction);
-	o_radiance = vec4(radiance_distance.rgb, 1.0);
-	o_distance = vec4(vec3(radiance_distance.a), 1.0);
+	o_radiance = vec4(texture(u_radiance_cubemap, direction).rgb, 1.0);
+	o_distance = vec4(texture(u_distance_cubemap, direction).rg, 0.0, 0.0);
 
 	o_normals = texture(u_normals_cubemap, direction);
 }
