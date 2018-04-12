@@ -24,7 +24,7 @@ var settings = {
 };
 
 var sceneSettings = {
-	ambientColor: new Float32Array([0.15, 0.15, 0.15, 1.0]),
+	ambientColor: new Float32Array([0.0, 0.0, 0.0, 1.0]),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -323,9 +323,8 @@ function init() {
 			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
 		}
 
+		//loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 /*
-		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
-
 		{
 			let m = mat4.create();
 			let r = quat.fromEuler(quat.create(), 0, 45, 0);
@@ -546,6 +545,7 @@ function placeProbes() {
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
+
 /*
 	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
 	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
@@ -867,6 +867,8 @@ function renderScene() {
 		.texture('L.normalProbeGrid', probeOctahedrals['normals'])
 		.texture('L.distanceProbeGrid', probeOctahedrals['distanceHigh'])
 		.texture('L.lowResolutionDistanceProbeGrid', probeOctahedrals['distanceLow'])
+		.texture('L.irradianceProbeGrid', probeOctahedrals['irradiance'])
+		.texture('L.meanDistProbeGrid', probeOctahedrals['filteredDistance'])
 		.uniform('L.probeCounts', probeCount)
 		.uniform('L.probeStartPosition', probeOrigin)
 		.uniform('L.probeStep', probeStep)

@@ -732,6 +732,68 @@ TraceResult trace_alt(LightFieldSurface lightFieldSurface, Ray worldSpaceRay, in
 ///////////////////////////////////////////////////////////////////////////////
 // "Utility" (TODO: maybe move these functions to the main shader?)
 
+vec3 computePrefilteredIrradiance(Point3 wsPosition, vec3 wsN) {
+	GridCoord baseGridCoord = baseGridCoord(L, wsPosition);
+	Point3 baseProbePos = gridCoordToPosition(L, baseGridCoord);
+	vec3 sumIrradiance = vec3(0.0);
+	float sumWeight = 0.0;
+	// Trilinear interpolation values along axes
+	Vector3 alpha = clamp((wsPosition - baseProbePos) / L.probeStep, Vector3(0), Vector3(1));
+
+	// Iterate over the adjacent probes defining the surrounding vertex "cage"
+	for (int i = 0; i < 8; ++i) {
+		// Compute the offset grid coord and clamp to the probe grid boundary
+		GridCoord  offset = ivec3(i, i >> 1, i >> 2) & ivec3(1);
+		GridCoord  probeGridCoord = clamp(baseGridCoord + offset, GridCoord(0), GridCoord(L.probeCounts - 1));
+		ProbeIndex p = gridCoordToProbeIndex(L, vec3(probeGridCoord));
+
+		// Compute the trilinear weights based on the grid cell vertex to smoothly
+		// transition between probes. Avoid ever going entirely to zero because that
+		// will cause problems at the border probes.
+		Vector3 trilinear = mix(1.0 - alpha, alpha, Vector3(offset));
+		float weight = trilinear.x * trilinear.y * trilinear.z;
+
+		// Make cosine falloff in tangent plane with respect to the angle from the surface to the probe so that we never
+		// test a probe that is *behind* the surface.
+		// It doesn't have to be cosine, but that is efficient to compute and we must clip to the tangent plane.
+		Point3 probePos = gridCoordToPosition(L, probeGridCoord);
+		Vector3 probeToPoint = wsPosition - probePos;
+		Vector3 dir = normalize(-probeToPoint);
+		vec2 dirSpherical = spherical_from_direction(-dir);
+
+		// Smooth back-face test
+		weight *= max(0.05, dot(dir, wsN));
+
+		vec2 temp = texture(L.meanDistProbeGrid, vec3(dirSpherical, p)).rg;
+		float mean = temp.x;
+		float variance = abs(temp.y - (mean * mean));
+
+		float distToProbe = length(probeToPoint);
+		// http://www.punkuser.net/vsm/vsm_paper.pdf; equation 5
+		float t_sub_mean = distToProbe - mean;
+		float chebychev = variance / (variance + (t_sub_mean * t_sub_mean));
+
+		weight *= ((distToProbe <= mean) ? 1.0 : max(chebychev, 0.0));
+
+		// Avoid zero weight
+		weight = max(0.0002, weight);
+
+		sumWeight += weight;
+
+		Vector3 irradianceDir = normalize(wsN);
+		vec2 sphericalUV = spherical_from_direction(irradianceDir);
+
+		vec3 probeIrradiance = texture(L.irradianceProbeGrid, vec3(sphericalUV, p)).rgb;
+
+		// Debug probe contribution by visualizing as colors
+		// probeIrradiance = 0.5 * probeIndexToColor(lightFieldSurface, p);
+
+		sumIrradiance += weight * probeIrradiance;
+	}
+
+	return 2.0 * PI * sumIrradiance / sumWeight;
+}
+
 vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3 normal)
 {
 	// TODO: Don't assume perfect mirror!!!
