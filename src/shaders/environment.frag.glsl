@@ -27,7 +27,7 @@ void main()
 	vec3 color = texture(u_environment_map, uv).rgb;
 	color *= u_environment_brightness;
 
-	o_color = vec4(color, 0.0);
+	o_color = vec4(color, 1.0);
 
 	// NOTE: This will be clamped to 1.0 for normal framebuffers, but for the float distance texture that is used for
 	// the precompute step this will actually be 10000.0 which is the effectively inifinitely far away.
