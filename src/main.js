@@ -467,15 +467,20 @@ function createPointsInSphere(count) {
 	for (var i = 0; i < count; ++i) {
 
 		var x, y, z;
+		var lengthSquared;
+
 		do {
 			x = Math.random() * 2.0 - 1.0;
 			y = Math.random() * 2.0 - 1.0;
 			z = Math.random() * 2.0 - 1.0;
-		} while (x*x + y*y + z*z >= 1.0);
+			lengthSquared = x*x + y*y + z*z;
+		} while (lengthSquared >= 1.0);
 
-		points[3 * i + 0] = x;
-		points[3 * i + 1] = y;
-		points[3 * i + 2] = z;
+		var length = Math.sqrt(lengthSquared);
+
+		points[3 * i + 0] = x / length;
+		points[3 * i + 1] = y / length;
+		points[3 * i + 2] = z / length;
 	}
 
 	return points;
