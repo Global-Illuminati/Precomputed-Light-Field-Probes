@@ -759,11 +759,11 @@ vec3 computePrefilteredIrradiance(Point3 wsPosition, vec3 wsN) {
 		Point3 probePos = gridCoordToPosition(L, probeGridCoord);
 		Vector3 probeToPoint = wsPosition - probePos;
 		Vector3 dir = normalize(-probeToPoint);
-		vec2 dirSpherical = spherical_from_direction(-dir);
 
 		// Smooth back-face test
 		weight *= max(0.05, dot(dir, wsN));
 
+		vec2 dirSpherical = spherical_from_direction(-dir);
 		vec2 temp = texture(L.meanDistProbeGrid, vec3(dirSpherical, p)).rg;
 		float mean = temp.x;
 		float variance = abs(temp.y - (mean * mean));

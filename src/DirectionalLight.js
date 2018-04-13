@@ -8,7 +8,7 @@ function DirectionalLight(direction, color) {
 
 	//
 
-	this.orthoProjectionSize = 120.0;
+	this.orthoProjectionSize = 40.0;
 
 	this.lightViewMatrix = mat4.create();
 	this.lightProjectionMatrix = mat4.create();

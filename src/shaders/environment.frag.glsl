@@ -31,7 +31,7 @@ void main()
 
 	// NOTE: This will be clamped to 1.0 for normal framebuffers, but for the float distance texture that is used for
 	// the precompute step this will actually be 10000.0 which is the effectively inifinitely far away.
-	float dist = 10000.0;
+	float dist = 10.0;
 	o_distance = vec4(dist, dist * dist, 0.0, 0.0);
 
 }

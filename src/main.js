@@ -13,6 +13,7 @@ var settings = {
 	target_fps: 60,
 	environment_brightness: 1.5,
 
+	render_probe_locations: true,
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
 	debug_show_probe_map: 'radiance',
@@ -160,7 +161,7 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 			objects.forEach(function(object) {
 
 				var material = materials[object.material];
-				var diffuseMap  = (material.properties.map_Kd)   ? directory + material.properties.map_Kd   : 'default_diffuse.png';
+				var diffuseMap  = (material.properties.map_Kd)   ? directory + material.properties.map_Kd   : 'default_diffuse_alt.png';
 				var specularMap = (material.properties.map_Ks)   ? directory + material.properties.map_Ks   : 'default_specular.jpg';
 				var normalMap   = (material.properties.map_norm) ? directory + material.properties.map_norm : 'default_normal.jpg';
 
@@ -221,6 +222,7 @@ function init() {
 
 	var probe = gui.addFolder('Probe stuff');
 	probe.add({ f: function() { performPrecomputeThisFrame = true }}, 'f').name('Precompute');
+	probe.add(settings, 'render_probe_locations').name('Render locations');
 	probe.add(settings, 'do_debug_show_probe').name('Show probe');
 	probe.add(settings, 'debug_show_probe_index', 0, 64).name('... probe index');
 	probe.add(settings, 'debug_show_probe_map', settings.debug_show_probe_map_options).name('... texture');
@@ -247,14 +249,14 @@ function init() {
 	//////////////////////////////////////
 	// Camera stuff
 
-	var cameraPos = vec3.fromValues(0, 1.75, 2);
-	var cameraRot = quat.fromEuler(quat.create(), 15, -90, 0);
+	var cameraPos = vec3.fromValues(-2, 1.75, -2);
+	var cameraRot = quat.fromEuler(quat.create(), -15, -150, 0);
 	camera = new Camera(cameraPos, cameraRot);
 
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight();
+	directionalLight = new DirectionalLight(vec3.fromValues(0.35, -0.7, -1.0));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
 	environmentMap = loadTexture('environments/ocean.jpg', {
@@ -320,9 +322,18 @@ function init() {
 			let t = vec3.fromValues(0, 0, 0);
 			let s = vec3.fromValues(1, 1, 1);
 			mat4.fromRotationTranslationScale(m, r, t, s);
-			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
+			loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
 		}
-
+/*
+		{
+			let m = mat4.create();
+			let r = quat.fromEuler(quat.create(), 0, 0, 0);
+			let t = vec3.fromValues(0, 0, 0);
+			let s = vec3.fromValues(4, 4, 4);
+			mat4.fromRotationTranslationScale(m, r, t, s);
+			loadObject('cornell/', 'cornell.obj', 'cornell.mtl', m);
+		}
+*/
 		//loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 /*
 		{
@@ -424,14 +435,15 @@ function setupDirectionalLightShadowMapFramebuffer(size) {
 
 	var colorBuffer = app.createTexture2D(size, size, {
 		format: PicoGL.RED,
-		internalFormat: PicoGL.R8,
-		type: PicoGL.UNSIGNED_BYTE,
+		internalFormat: PicoGL.R16F,
+		type: PicoGL.FLOAT,
 		minFilter: PicoGL.NEAREST,
 		magFilter: PicoGL.NEAREST
 	});
 
 	var depthBuffer = app.createTexture2D(size, size, {
-		format: PicoGL.DEPTH_COMPONENT
+		format: PicoGL.DEPTH_COMPONENT,
+		internalFormat: PicoGL.DEPTH_COMPONENT32F
 	});
 
 	shadowMapFramebuffer = app.createFramebuffer()
@@ -542,10 +554,15 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 
 function placeProbes() {
 
+	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
+	probeStep   = vec3.fromValues(2.0, 2.0, 2.0);
+	probeCount  = new Int32Array([4, 4, 4]);
+
+/*
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
-
+*/
 /*
 	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
 	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
@@ -702,7 +719,9 @@ function setupProbes(cubemapSize, octahedralSize) {
 		format: PicoGL.RGB,
 		internalFormat: PicoGL.R11F_G11F_B10F,
 		minFilter: PicoGL.LINEAR,
-		magFilter: PicoGL.LINEAR
+		magFilter: PicoGL.LINEAR,
+		wrapS: PicoGL.CLAMP_TO_EDGE,
+		wrapT: PicoGL.CLAMP_TO_EDGE
 	});
 
 	probeOctahedrals['filteredDistance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
@@ -710,7 +729,9 @@ function setupProbes(cubemapSize, octahedralSize) {
 		format: PicoGL.RG,
 		internalFormat: PicoGL.RG16F,
 		minFilter: PicoGL.LINEAR,
-		magFilter: PicoGL.LINEAR
+		magFilter: PicoGL.LINEAR,
+		wrapS: PicoGL.CLAMP_TO_EDGE,
+		wrapT: PicoGL.CLAMP_TO_EDGE
 	});
 
 }
@@ -766,7 +787,10 @@ function render() {
 			renderScene();
 
 			var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
+
+			if (settings.render_probe_locations) {
 			renderProbeLocations(viewProjection);
+			}
 
 			var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
 			renderEnvironment(inverseViewProjection)
@@ -1016,7 +1040,7 @@ function precomputeProbe(index) {
 
 			// Since we don't use HDR rendering on the main buffer, but sort of here, increase the brightness
 			// so that the environment appears brighter in reflections than in the sky (which would be/is saturated)
-			var brightness = settings.environment_brightness * 1.35;
+			var brightness = settings.environment_brightness;// * 1.35; or not..?
 
 			environmentDrawCall
 			.uniform('u_camera_position', camera.position)
