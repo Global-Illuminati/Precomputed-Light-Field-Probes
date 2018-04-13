@@ -53,6 +53,7 @@ var shadowMapSize = 4096;
 var shadowMapFramebuffer;
 
 var camera;
+var spotLight;
 var directionalLight;
 var meshes = [];
 var performPrecomputeThisFrame = false;
@@ -83,7 +84,7 @@ var probeCubeSize;
 
 var irradianceDrawCall;
 var irradianceFramebuffer;
-var irradianceSize = 256;
+var irradianceSize = 128;
 //filtered distance, squared distance as well..
 
 window.addEventListener('DOMContentLoaded', function () {
@@ -161,7 +162,7 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 			objects.forEach(function(object) {
 
 				var material = materials[object.material];
-				var diffuseMap  = (material.properties.map_Kd)   ? directory + material.properties.map_Kd   : 'default_diffuse_alt.png';
+				var diffuseMap  = (material.properties.map_Kd)   ? directory + material.properties.map_Kd   : 'default_diffuse.png';
 				var specularMap = (material.properties.map_Ks)   ? directory + material.properties.map_Ks   : 'default_specular.jpg';
 				var normalMap   = (material.properties.map_norm) ? directory + material.properties.map_norm : 'default_normal.jpg';
 
@@ -229,7 +230,7 @@ function init() {
 	probe.open();
 
 	var irradiance = probe.addFolder('Irradiance');
-	irradiance.add(settings, 'irradiance_num_samples', 1, 1024).name('Num samples');
+	irradiance.add(settings, 'irradiance_num_samples', 1, 4096).name('Num samples');
 	irradiance.add(settings, 'irradiance_lobe_size', 0.0, 1.0).name('Cos lobe size');
 
 	var filteredDistance = probe.addFolder('Filtered distance');
@@ -256,8 +257,12 @@ function init() {
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight(vec3.fromValues(0.35, -0.7, -1.0));
+	directionalLight = new DirectionalLight(vec3.fromValues(0.35, -0.7, -1.0), vec3.fromValues(0.2, 0.2, 0.2));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
+
+	var spotPos = vec3.fromValues(-3.2, 2.2, 0.5);
+	var spotDir = vec3.fromValues(-1, 0, 0.3);
+	spotLight = new SpotLight(spotPos, spotDir, 20, vec3.fromValues(1.0, 0.6, 20.0));
 
 	environmentMap = loadTexture('environments/ocean.jpg', {
 		minFilter: PicoGL.NEAREST,
@@ -514,7 +519,7 @@ function createPointsInSphere(count) {
 function createSpherSamplesUniformBuffer() {
 
 	// Make sure this matches the value in the shader!
-	var size = 1024;
+	var size = 4096;
 
 	var description = new Array(size).fill(PicoGL.FLOAT_VEC4);
 	var uniformBuffer = app.createUniformBuffer(description);
@@ -556,7 +561,7 @@ function placeProbes() {
 
 	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
 	probeStep   = vec3.fromValues(2.0, 2.0, 2.0);
-	probeCount  = new Int32Array([4, 4, 4]);
+	probeCount  = new Int32Array([4, 2, 4]);
 
 /*
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
@@ -862,6 +867,9 @@ function renderScene() {
 	var lightViewProjection = directionalLight.getLightViewProjectionMatrix();
 	var shadowMap = shadowMapFramebuffer.depthTexture;
 
+	var spotLightViewPosition = spotLight.viewSpacePosition(camera);
+	var spotLightViewDirection = spotLight.viewSpaceDirection(camera);
+
 	app.defaultDrawFramebuffer()
 	.defaultViewport()
 	.depthTest()
@@ -884,6 +892,10 @@ function renderScene() {
 		.uniform('u_dir_light_view_direction', dirLightViewDirection)
 		.uniform('u_light_projection_from_world', lightViewProjection)
 		.texture('u_shadow_map', shadowMap)
+		.uniform('u_spot_light_color', spotLight.color)
+		.uniform('u_spot_light_cone', spotLight.cone)
+		.uniform('u_spot_light_view_position', spotLightViewPosition)
+		.uniform('u_spot_light_view_direction', spotLightViewDirection)
 		.texture('u_environment_map', environmentMap)
 
 		// GI uniforms
@@ -1001,11 +1013,14 @@ function precomputeProbe(index) {
 		quat.fromMat3(quaternion, matrix3);
 		quat.conjugate(quaternion, quaternion); // (since the lookat already accounts for the inverse)
 		quat.normalize(quaternion, quaternion);
-		var cam = { orientation: quaternion };
+		var cam = { orientation: quaternion, viewMatrix: viewMatrix };
 
 		var dirLightViewDirection = directionalLight.viewSpaceDirection(cam);
 		var lightViewProjection = directionalLight.getLightViewProjectionMatrix();
 		var shadowMap = shadowMapFramebuffer.depthTexture;
+
+		var spotLightViewPosition = spotLight.viewSpacePosition(cam);
+		var spotLightViewDirection = spotLight.viewSpaceDirection(cam);
 
 		app.drawFramebuffer(probeRenderingFramebuffer)
 		.viewport(0, 0, probeCubeSize, probeCubeSize)
@@ -1026,6 +1041,10 @@ function precomputeProbe(index) {
 			.uniform('u_dir_light_view_direction', dirLightViewDirection)
 			.uniform('u_light_projection_from_world', lightViewProjection)
 			.texture('u_shadow_map', shadowMap)
+			.uniform('u_spot_light_color', spotLight.color)
+			.uniform('u_spot_light_cone', spotLight.cone)
+			.uniform('u_spot_light_view_position', spotLightViewPosition)
+			.uniform('u_spot_light_view_direction', spotLightViewDirection)
 			.draw();
 
 		}
@@ -1050,6 +1069,10 @@ function precomputeProbe(index) {
 
 		}
 	}
+
+	// Make sure all cubemaps are fully rendered before using them in the following steps
+	// It really shouldn't be needed right, but it sure is.
+	app.gl.flush();
 
 	//
 	// Project cubemaps to octahedrals

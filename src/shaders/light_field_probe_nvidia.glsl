@@ -763,8 +763,8 @@ vec3 computePrefilteredIrradiance(Point3 wsPosition, vec3 wsN) {
 		// Smooth back-face test
 		weight *= max(0.05, dot(dir, wsN));
 
-		vec2 dirSpherical = spherical_from_direction(-dir);
-		vec2 temp = texture(L.meanDistProbeGrid, vec3(dirSpherical, p)).rg;
+		vec2 octDir = octEncode(-dir) * 0.5 + 0.5;
+		vec2 temp = texture(L.meanDistProbeGrid, vec3(octDir, p)).rg;
 		float mean = temp.x;
 		float variance = abs(temp.y - (mean * mean));
 
@@ -781,9 +781,9 @@ vec3 computePrefilteredIrradiance(Point3 wsPosition, vec3 wsN) {
 		sumWeight += weight;
 
 		Vector3 irradianceDir = normalize(wsN);
-		vec2 sphericalUV = spherical_from_direction(irradianceDir);
+		vec2 octUV = octEncode(irradianceDir) * 0.5 + 0.5;
 
-		vec3 probeIrradiance = texture(L.irradianceProbeGrid, vec3(sphericalUV, p)).rgb;
+		vec3 probeIrradiance = texture(L.irradianceProbeGrid, vec3(octUV, p)).rgb;
 
 		// Debug probe contribution by visualizing as colors
 		// probeIrradiance = 0.5 * probeIndexToColor(lightFieldSurface, p);

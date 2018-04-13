@@ -21,6 +21,5 @@ void main()
 
 	o_radiance = vec4(texture(u_radiance_cubemap, direction).rgb, 1.0);
 	o_distance = vec4(texture(u_distance_cubemap, direction).rg, 0.0, 0.0);
-
-	o_normals = texture(u_normals_cubemap, direction);
+	o_normals  = vec4(texture(u_normals_cubemap, direction).xyz, 0.0);
 }

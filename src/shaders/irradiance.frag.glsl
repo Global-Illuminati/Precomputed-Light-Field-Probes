@@ -9,7 +9,7 @@ precision highp samplerCube;
 in vec2 v_tex_coord;
 
 // For sampling "random" points in a sphere
-const int  NUM_SPHERE_SAMPLES = 1024;
+const int  NUM_SPHERE_SAMPLES = 4096;
 layout(std140) uniform SphereSamples
 {
     // (must pad to 16 bytes, so .a is unused)
@@ -39,8 +39,7 @@ vec3 pointOnUnitSphere(int i, int n)
 
 void main()
 {
-    //vec3 N = normalize(vec3(v_tex_coord.x, v_tex_coord.y, 1.0));//octDecode(v_tex_coord * 2.0 - 1.0);
-    vec3 N = direction_from_spherical(v_tex_coord);
+    vec3 N = octDecode(v_tex_coord * 2.0 - 1.0);
     vec3 irradiance = vec3(0.0);
 
     for (int i = 0; i < u_num_samples; ++i)

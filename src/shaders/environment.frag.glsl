@@ -29,9 +29,8 @@ void main()
 
 	o_color = vec4(color, 1.0);
 
-	// NOTE: This will be clamped to 1.0 for normal framebuffers, but for the float distance texture that is used for
-	// the precompute step this will actually be 10000.0 which is the effectively inifinitely far away.
-	float dist = 10.0;
+	// NOTE: We want it to be as small as possible while still larger than distance to all geometry
+	float dist = 200.0;
 	o_distance = vec4(dist, dist * dist, 0.0, 0.0);
 
 }
