@@ -25,7 +25,7 @@ var settings = {
 };
 
 var sceneSettings = {
-	ambientColor: new Float32Array([0.0, 0.0, 0.0, 1.0]),
+	ambientColor: new Float32Array([0.25, 0.25, 0.25, 1.0]),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -360,7 +360,7 @@ function init() {
 			loadObject('quad/', 'quad.obj', 'quad.mtl', m);
 		}
 */
-		setupProbes(1024, 1024);
+		setupProbes(256, 1024);
 
 	});
 
@@ -638,9 +638,9 @@ function setupProbes(cubemapSize, octahedralSize) {
 	probeCubemaps['radiance'] = app.createCubemap({
 		width: cubemapSize,
 		height: cubemapSize,
-		type: PicoGL.FLOAT,
+		type: PicoGL.HALF_FLOAT,
 		format: PicoGL.RGBA,
-		internalFormat: PicoGL.RGBA32F
+		internalFormat: PicoGL.RGBA16F
 	});
 
 	probeCubemaps['depth'] = app.createCubemap({
@@ -648,7 +648,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 		height: cubemapSize,
 		type: PicoGL.FLOAT,
 		format: PicoGL.DEPTH_COMPONENT,
-		internalFormat: PicoGL.DEPTH_COMPONENT32F
+		internalFormat: PicoGL.DEPTH_COMPONENT16F
 	});
 
 	probeCubemaps['normals'] = app.createCubemap({
@@ -656,7 +656,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 		height: cubemapSize,
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGBA,
-		internalFormat: PicoGL.RGBA32F
+		internalFormat: PicoGL.RGBA16F
 	});
 
 	probeCubemaps['distance'] = app.createCubemap({
