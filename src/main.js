@@ -889,7 +889,7 @@ function renderScene() {
 		mesh.drawCall
 
 		// Default uniforms
-		.uniform('u_camera_position', camera.position)
+		//.uniform('u_camera_position', camera.position)
 		.uniform('u_world_from_local', mesh.modelMatrix)
 		.uniform('u_view_from_world', camera.viewMatrix)
 		.uniform('u_projection_from_view', camera.projectionMatrix)
@@ -904,10 +904,10 @@ function renderScene() {
 		.texture('u_environment_map', environmentMap)
 
 		// GI uniforms
-		.texture('L.radianceProbeGrid', probeOctahedrals['radiance'])
-		.texture('L.normalProbeGrid', probeOctahedrals['normals'])
-		.texture('L.distanceProbeGrid', probeOctahedrals['distanceHigh'])
-		.texture('L.lowResolutionDistanceProbeGrid', probeOctahedrals['distanceLow'])
+		//.texture('L.radianceProbeGrid', probeOctahedrals['radiance'])
+		//.texture('L.normalProbeGrid', probeOctahedrals['normals'])
+		//.texture('L.distanceProbeGrid', probeOctahedrals['distanceHigh'])
+		//.texture('L.lowResolutionDistanceProbeGrid', probeOctahedrals['distanceLow'])
 		.texture('L.irradianceProbeGrid', probeOctahedrals['irradiance'])
 		.texture('L.meanDistProbeGrid', probeOctahedrals['filteredDistance'])
 		.uniform('L.probeCounts', probeCount)
