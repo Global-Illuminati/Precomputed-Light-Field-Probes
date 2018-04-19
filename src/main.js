@@ -25,7 +25,7 @@ var settings = {
 };
 
 var sceneSettings = {
-	ambientColor: new Float32Array([0.25, 0.25, 0.25, 1.0]),
+	ambientColor: new Float32Array([0.0, 0.0, 0.0, 1.0]),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
