@@ -60,6 +60,7 @@ var performPrecomputeThisFrame = false;
 
 var probeDrawCall;
 var probeLocations;
+var precomputeIndex = 0;
 
 var probeOrigin;
 var probeCount;
@@ -768,17 +769,20 @@ function render() {
 		renderShadowMap();
 
 		if (performPrecomputeThisFrame) {
-
 			let start = new Date().getTime();
 
-			precompute();
+			//precompute();
+			precomputeProbe(precomputeIndex);
 
 			let end = new Date().getTime();
 			let timePassed = end - start;
-			console.log('Precompute took ' + timePassed + 'ms');
+			console.log('Precompute for probe ' + precomputeIndex + ' took ' + timePassed + 'ms');
+			precomputeIndex++;
 
-			performPrecomputeThisFrame = false;
-
+			if (precomputeIndex == probeLocations.length) {
+				performPrecomputeThisFrame = false;
+				precomputeIndex = 0;
+			}
 		}
 
 		if (settings.do_debug_show_probe) {
@@ -955,13 +959,13 @@ function renderEnvironment(inverseViewProjection) {
 
 }
 
-function precompute() {
+/*function precompute() {
 
 	for (var i = 0, len = probeLocations.length; i < len; ++i) {
 		precomputeProbe(i)
 	}
 
-}
+}*/
 
 function precomputeProbe(index) {
 
