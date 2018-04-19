@@ -9,8 +9,6 @@ var settings = {
 	target_fps: 60,
 	environment_brightness: 1.5,
 
-	spot_light_color: [0.0, 0.0, 1.0, 1.0],
-
 	render_probe_locations: false,
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
@@ -20,7 +18,7 @@ var settings = {
 	irradiance_num_samples: 512,
 	irradiance_lobe_size: 0.99,
 	filtered_distance_num_samples: 32,
-	filtered_distance_lobe_size: 0.08
+	filtered_distance_lobe_size: 0.12
 };
 
 var sceneSettings = {
@@ -260,6 +258,31 @@ function init() {
 	var spotPos = vec3.fromValues(-3.2, 2.2, 0.5);
 	var spotDir = vec3.fromValues(-1, 0, 0.3);
 	spotLight = new SpotLight(spotPos, spotDir, 20, vec3.fromValues(1.0, 0.6, 20.0));
+
+	// Move spot light
+	document.addEventListener('keydown', function(e) {
+
+		var spotDiff;
+		if (e.keyCode == 37 /* left */) spotDiff = vec3.fromValues(0, 0, 0.1);
+		if (e.keyCode == 39 /* right */) spotDiff = vec3.fromValues(0, 0, -0.1);
+
+		if (spotDiff) {
+			vec3.add(spotLight.position, spotLight.position, spotDiff);
+			initiatePrecompute();
+		}
+
+		var dirDiff;
+		if (e.keyCode == 38 /* up */) dirDiff = 0.01;//vec3.fromValues(0, 0.1, 0);
+		if (e.keyCode == 40 /* down */) dirDiff = -0.01;//vec3.fromValues(0, -0.1, 0);
+
+		if (dirDiff) {
+
+			vec3.rotateX(directionalLight.direction, directionalLight.direction,
+				vec3.create(), dirDiff);
+			initiatePrecompute();
+		}
+
+	});
 
 	environmentMap = loadTexture('environments/ocean.jpg', {
 		minFilter: PicoGL.NEAREST,
@@ -669,7 +692,7 @@ function setupProbes(cubemapSize, irradianceOctahedralSize) {
 	probeOctahedrals['filteredDistance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RG,
-		internalFormat: PicoGL.RG16F,
+		internalFormat: PicoGL.RG32F,
 		minFilter: PicoGL.LINEAR,
 		magFilter: PicoGL.LINEAR,
 		wrapS: PicoGL.CLAMP_TO_EDGE,
@@ -717,11 +740,12 @@ function render() {
 
 			if (precomputeIndex == probeLocations.length) {
 
-				performPrecomputeThisFrame = false;
-				precomputeIndex = 0;
-
 				var averageTime = precomputeTimes.reduce((acc, x) => acc + x) / probeLocations.length;
 				console.log('Average probe precompute time: '  + averageTime + 'ms');
+
+				performPrecomputeThisFrame = false;
+				precomputeIndex = 0;
+				precomputeTimes = [];
 			}
 		}
 
@@ -894,6 +918,10 @@ function renderEnvironment(inverseViewProjection) {
 }
 
 function initiatePrecompute() {
+
+	if (!probeLocations) {
+		return;
+	}
 
 	var queue = [];
 	for (var i = 0; i < probeLocations.length; ++i) {
