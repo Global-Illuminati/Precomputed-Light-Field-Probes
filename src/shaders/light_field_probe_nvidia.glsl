@@ -801,7 +801,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 	vec3 origin = world_space_pos + 0.25 * wi;
 	Ray world_space_ray = makeRay(origin, wi);
 
-	float hit_distance = 1000.0; // (clear/sky depth is 10000)
+	float hit_distance = 100.0; // (clear/sky depth is 10000)
 	ProbeIndex hit_probe_index;
 	vec2 hit_tex_coord;
 
@@ -823,7 +823,8 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
     }
     else if (result == TRACE_RESULT_UNKNOWN)
     {
-        return vec3(1.0, 0.0, 1.0);
+        //return vec3(1.0, 0.0, 1.0);
+        return vec3(0.0);
     }
 
 #else

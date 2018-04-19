@@ -84,7 +84,7 @@ var probeCubeSize;
 
 var irradianceDrawCall;
 var irradianceFramebuffer;
-var irradianceSize = 128;
+var irradianceSize = 1024;//128;
 //filtered distance, squared distance as well..
 
 window.addEventListener('DOMContentLoaded', function () {
@@ -257,7 +257,7 @@ function init() {
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight(vec3.fromValues(0.35, -0.7, -1.0), vec3.fromValues(0.2, 0.2, 0.2));
+	directionalLight = new DirectionalLight();//vec3.fromValues(0.35, -0.7, -1.0), vec3.fromValues(0.2, 0.2, 0.2));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
 	var spotPos = vec3.fromValues(-3.2, 2.2, 0.5);
@@ -327,7 +327,7 @@ function init() {
 			let t = vec3.fromValues(0, 0, 0);
 			let s = vec3.fromValues(1, 1, 1);
 			mat4.fromRotationTranslationScale(m, r, t, s);
-			loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
+			//loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
 		}
 /*
 		{
@@ -339,7 +339,7 @@ function init() {
 			loadObject('cornell/', 'cornell.obj', 'cornell.mtl', m);
 		}
 */
-		//loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
+		loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
 /*
 		{
 			let m = mat4.create();
@@ -558,21 +558,22 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 }
 
 function placeProbes() {
-
+/*
 	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
-	probeStep   = vec3.fromValues(2.0, 2.0, 2.0);
-	probeCount  = new Int32Array([4, 2, 4]);
+	probeStep   = vec3.fromValues(6.5, 2.0, 6.5);
+	probeCount  = new Int32Array([2, 2, 2]);
+*/
 
 /*
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
 */
-/*
+
 	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
 	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
 	probeCount  = new Int32Array([4, 4, 4]);
-*/
+
 /*
 	probeOrigin = vec3.fromValues(-6.0, 1.5, -4.2);
 	probeStep   = vec3.fromValues(3.0, 3.0, 3.0);
@@ -770,7 +771,9 @@ function render() {
 
 			let start = new Date().getTime();
 
+			app.gl.finish();
 			precompute();
+			app.gl.finish();
 
 			let end = new Date().getTime();
 			let timePassed = end - start;

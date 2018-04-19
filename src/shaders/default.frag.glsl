@@ -155,7 +155,10 @@ void main()
 	vec3 fragment_to_camera_dir = normalize(u_camera_position - fragment_world_space_pos);
 	vec3 indirect_specular_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
 
-	color += 0.00004 * shininess * indirect_specular_light;
+	if (dot(vec3(0, 1, 0), fragment_world_space_normal) > 0.99)
+	{
+		color += 0.25 * shininess * indirect_specular_light;
+	}
 
 	vec3 indirect_diffuse_light = computePrefilteredIrradiance(fragment_world_space_pos, fragment_world_space_normal);
 	color += 0.26 * diffuse * indirect_diffuse_light;
