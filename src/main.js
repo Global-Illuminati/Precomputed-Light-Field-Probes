@@ -1,9 +1,5 @@
 'using strict';
 
-function validateFramebuffer(framebuffer) {
-	console.assert(framebuffer.getStatus() === PicoGL.FRAMEBUFFER_COMPLETE, "Framebuffer is not complete!");
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 var stats;
@@ -15,7 +11,7 @@ var settings = {
 
 	spot_light_color: [0.0, 0.0, 1.0, 1.0],
 
-	render_probe_locations: true,
+	render_probe_locations: false,
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
 	debug_show_probe_map: 'irradiance',
@@ -23,6 +19,7 @@ var settings = {
 
 	irradiance_num_samples: 512,
 	irradiance_lobe_size: 0.99,
+	filtered_distance_num_samples: 32,
 	filtered_distance_lobe_size: 0.08
 };
 
@@ -62,6 +59,7 @@ var meshes = [];
 var performPrecomputeThisFrame = false;
 var precomputeIndex = 0;
 var precomputeQueue = [];
+var precomputeTimes;
 
 var probeDrawCall;
 var probeLocations;
@@ -130,6 +128,8 @@ function loadTexture(imageName, options) {
 		texture.resize(image.width, image.height);
 		texture.data(image);
 
+		initiatePrecompute();
+
 	};
 	image.src = 'assets/' + imageName;
 	return texture;
@@ -183,6 +183,8 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 					shadowMapDrawCall: shadowMappingDrawCall
 				});
 
+				initiatePrecompute();
+
 			});
 		});
 	});
@@ -212,7 +214,8 @@ function init() {
 	picoPrecomputeTimer = app.createTimer();
 
 	gui = new dat.GUI();
-	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness');
+	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness')
+	.onChange(function(value) { initiatePrecompute(); });
 
 	var probe = gui.addFolder('Probe stuff');
 	probe.add({ f: function() { initiatePrecompute() }}, 'f').name('Precompute');
@@ -227,6 +230,7 @@ function init() {
 	irradiance.add(settings, 'irradiance_lobe_size', 0.0, 1.0).name('Cos lobe size');
 
 	var filteredDistance = probe.addFolder('Filtered distance');
+	filteredDistance.add(settings, 'filtered_distance_num_samples', 1, 128).name('Num samples');
 	filteredDistance.add(settings, 'filtered_distance_lobe_size', 0.0, 0.5).name('Cos lobe size');
 
 	window.addEventListener('keydown', function(e) {
@@ -705,12 +709,19 @@ function render() {
 			var realIndex = precomputeQueue[precomputeIndex++];
 			precomputeProbe(realIndex);
 
-			let end = new Date().getTime();
-			let timePassed = end - start;
-			console.log('Precompute for probe ' + realIndex + ' took ' + timePassed + 'ms');
+			var realIndex = precomputeQueue[precomputeIndex++];
+			precomputeProbe(realIndex);
+
+			let timePassed = new Date().getTime() - start;
+			precomputeTimes.push(timePassed);
 
 			if (precomputeIndex == probeLocations.length) {
+
 				performPrecomputeThisFrame = false;
+				precomputeIndex = 0;
+
+				var averageTime = precomputeTimes.reduce((acc, x) => acc + x) / probeLocations.length;
+				console.log('Average probe precompute time: '  + averageTime + 'ms');
 			}
 		}
 
@@ -718,7 +729,7 @@ function render() {
 
 			var name = settings.debug_show_probe_map;
 			var layer = settings.debug_show_probe_index;
-			var isDepthMap = name.indexOf('istance') != -1;
+			var isDepthMap = name == 'filteredDistance';
 			renderTextureArrayToScreen(probeOctahedrals[name], layer, isDepthMap);
 
 		} else {
@@ -882,14 +893,6 @@ function renderEnvironment(inverseViewProjection) {
 
 }
 
-/*function precompute() {
-
-	for (var i = 0, len = probeLocations.length; i < len; ++i) {
-		precomputeProbe(i)
-	}
-
-}*/
-
 function initiatePrecompute() {
 
 	var queue = [];
@@ -900,6 +903,8 @@ function initiatePrecompute() {
 
 	performPrecomputeThisFrame = true;
 	precomputeIndex = 0;
+
+	precomputeTimes = [];
 
 }
 
@@ -1041,7 +1046,7 @@ function precomputeProbe(index) {
 
 	irradianceDrawCall
 	.texture('u_radiance_cubemap', probeCubemaps['distance'])
-	.uniform('u_num_samples', settings.irradiance_num_samples)
+	.uniform('u_num_samples', settings.filtered_distance_num_samples)
 	.uniform('u_lobe_size', settings.filtered_distance_lobe_size)
 	.draw();
 
