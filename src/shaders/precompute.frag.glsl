@@ -35,8 +35,7 @@ uniform vec3  u_spot_light_view_position;
 uniform vec3  u_spot_light_view_direction;
 
 layout(location = 0) out vec4 o_color;
-layout(location = 1) out vec4 o_normal;
-layout(location = 2) out vec4 o_distance;
+layout(location = 1) out vec4 o_distance;
 
 void main()
 {
@@ -126,7 +125,6 @@ void main()
 	float distance_to_fragment = length(v_position);
 
 	o_color = vec4(color, 1.0);
-	o_normal = vec4(packNormal(v_world_space_normal), 1.0);
 	o_distance = vec4(distance_to_fragment, distance_to_fragment * distance_to_fragment, 0.0, 0.0);
 
 }

@@ -13,11 +13,13 @@ var settings = {
 	target_fps: 60,
 	environment_brightness: 1.5,
 
+	spot_light_color: [0.0, 0.0, 1.0, 1.0],
+
 	render_probe_locations: true,
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
-	debug_show_probe_map: 'radiance',
-	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance', 'filteredDistance'],
+	debug_show_probe_map: 'irradiance',
+	debug_show_probe_map_options: ['irradiance', 'filteredDistance'],
 
 	irradiance_num_samples: 512,
 	irradiance_lobe_size: 0.99,
@@ -56,37 +58,28 @@ var camera;
 var spotLight;
 var directionalLight;
 var meshes = [];
+
 var performPrecomputeThisFrame = false;
+var precomputeIndex = 0;
+var precomputeQueue = [];
 
 var probeDrawCall;
 var probeLocations;
-var precomputeIndex = 0;
 
 var probeOrigin;
 var probeCount;
 var probeStep;
 
-var octahedralDrawCall;
-var octahedralFramebuffer;
-var octahedralFramebufferLow;
-var lowPrecisionSizeDownsample = 16;
-var probeOctahedralSize;
-var probeOctahedrals = {
-	radiance: null,
-	distanceLow: null,
-	distanceHigh: null,
-	normals: null,
-	irradiance: null
-};
-
+// Cubemap stuff
 var probeRenderingFramebuffer;
-var probeCubemaps = {};
 var probeCubeSize;
+var probeCubemaps = {};
 
+// Octahedral irradiance stuff
+var probeOctahedrals = {};
 var irradianceDrawCall;
 var irradianceFramebuffer;
-var irradianceSize = 128;
-//filtered distance, squared distance as well..
+var irradianceSize;
 
 window.addEventListener('DOMContentLoaded', function () {
 
@@ -219,11 +212,10 @@ function init() {
 	picoPrecomputeTimer = app.createTimer();
 
 	gui = new dat.GUI();
-	gui.add(settings, 'target_fps', 0, 120).name('Target FPS');
 	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness');
 
 	var probe = gui.addFolder('Probe stuff');
-	probe.add({ f: function() { performPrecomputeThisFrame = true }}, 'f').name('Precompute');
+	probe.add({ f: function() { initiatePrecompute() }}, 'f').name('Precompute');
 	probe.add(settings, 'render_probe_locations').name('Render locations');
 	probe.add(settings, 'do_debug_show_probe').name('Show probe');
 	probe.add(settings, 'debug_show_probe_index', 0, 64).name('... probe index');
@@ -238,7 +230,7 @@ function init() {
 	filteredDistance.add(settings, 'filtered_distance_lobe_size', 0.0, 0.5).name('Cos lobe size');
 
 	window.addEventListener('keydown', function(e) {
-		if (e.keyCode == 80 /* p(recompute) */) performPrecomputeThisFrame = true;
+		if (e.keyCode == 80 /* p(recompute) */) initiatePrecompute();
 	});
 
 	//////////////////////////////////////
@@ -361,7 +353,7 @@ function init() {
 			loadObject('quad/', 'quad.obj', 'quad.mtl', m);
 		}
 */
-		setupProbes(256, 1024);
+		setupProbes(256, 128);
 
 	});
 
@@ -440,55 +432,40 @@ function createSphereVertexArray(radius, rings, sectors) {
 
 function setupDirectionalLightShadowMapFramebuffer(size) {
 
-	var colorBuffer = app.createTexture2D(size, size, {
-		format: PicoGL.RED,
-		internalFormat: PicoGL.R16F,
-		type: PicoGL.FLOAT,
-		minFilter: PicoGL.NEAREST,
-		magFilter: PicoGL.NEAREST
-	});
-
 	var depthBuffer = app.createTexture2D(size, size, {
 		format: PicoGL.DEPTH_COMPONENT,
-		internalFormat: PicoGL.DEPTH_COMPONENT32F
+		internalFormat: PicoGL.DEPTH_COMPONENT16F
 	});
 
 	shadowMapFramebuffer = app.createFramebuffer()
-	.colorTarget(0, colorBuffer)
 	.depthTarget(depthBuffer);
 
 }
 
 function setupSceneUniforms() {
 
-	//
-	// TODO: Fix all this! I got some weird results when I tried all this before but it should work...
-	//
-
 	sceneUniforms = app.createUniformBuffer([
-		PicoGL.FLOAT_VEC4 /* 0 - ambient color */   //,
-		//PicoGL.FLOAT_VEC4 /* 1 - directional light color */,
-		//PicoGL.FLOAT_VEC4 /* 2 - directional light direction */,
-		//PicoGL.FLOAT_MAT4 /* 3 - view from world matrix */,
-		//PicoGL.FLOAT_MAT4 /* 4 - projection from view matrix */
+		PicoGL.FLOAT_VEC4 /* 0 - ambient color */
 	])
 	.set(0, sceneSettings.ambientColor)
-	//.set(1, directionalLight.color)
-	//.set(2, directionalLight.direction)
-	//.set(3, camera.viewMatrix)
-	//.set(4, camera.projectionMatrix)
 	.update();
 
-/*
-	camera.onViewMatrixChange = function(newValue) {
-		sceneUniforms.set(3, newValue).update();
-	};
+}
 
-	camera.onProjectionMatrixChange = function(newValue) {
-		sceneUniforms.set(4, newValue).update();
-	};
-*/
+function shuffleArray(array) {
 
+	let counter = array.length;
+
+	while (counter > 0) {
+		let index = Math.floor(Math.random() * counter);
+
+		counter -= 1;
+		let temp = array[counter];
+		array[counter] = array[index];
+		array[index] = temp;
+	}
+
+	return array;
 }
 
 function createPointsInSphere(count) {
@@ -563,7 +540,7 @@ function placeProbes() {
 
 	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
 	probeStep   = vec3.fromValues(2.0, 2.0, 2.0);
-	probeCount  = new Int32Array([4, 2, 4]);
+	probeCount  = new Int32Array([4, 4, 4]);
 
 /*
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
@@ -624,7 +601,7 @@ function setupProbeDrawCall(vertexArray, shader) {
 
 }
 
-function setupProbes(cubemapSize, octahedralSize) {
+function setupProbes(cubemapSize, irradianceOctahedralSize) {
 
 	// Cubemap stuff
 
@@ -670,57 +647,11 @@ function setupProbes(cubemapSize, octahedralSize) {
 
 	// Octahedral stuff
 
-	octahedralFramebuffer = app.createFramebuffer();
-	probeOctahedralSize = octahedralSize;
-
-	octahedralFramebufferLow = app.createFramebuffer();
-	var lowSize = octahedralSize / lowPrecisionSizeDownsample;
-	probeOctahedralSizeLow = lowSize;
-
-	//
-	// NOTE: Formats below taken from the paper!
-	//
+	irradianceFramebuffer = app.createFramebuffer();
+	irradianceSize = irradianceOctahedralSize;
 
 	var numProbes = probeLocations.length;
 
-	probeOctahedrals['radiance'] = app.createTextureArray(octahedralSize, octahedralSize, numProbes, {
-		type: PicoGL.FLOAT,
-		format: PicoGL.RGB,
-		internalFormat: PicoGL.R11F_G11F_B10F,
-		minFilter: PicoGL.NEAREST,
-		magFilter: PicoGL.NEAREST
-	});
-
-	// TODO: Probably encode normals as RG8 instead to compress it a bit (like in the paper). We don't need much precision anyway...
-	probeOctahedrals['normals'] = app.createTextureArray(octahedralSize, octahedralSize, numProbes, {
-		type: PicoGL.UNSIGNED_BYTE,
-		format: PicoGL.RGB,
-		internalFormat: PicoGL.RGB8,
-		minFilter: PicoGL.NEAREST,
-		magFilter: PicoGL.NEAREST
-	});
-
-	probeOctahedrals['distanceHigh'] = app.createTextureArray(octahedralSize, octahedralSize, numProbes, {
-		type: PicoGL.FLOAT,
-		format: PicoGL.RED,
-		internalFormat: PicoGL.R16F,
-		minFilter: PicoGL.NEAREST,
-		magFilter: PicoGL.NEAREST
-	});
-
-	probeOctahedrals['distanceLow'] = app.createTextureArray(lowSize, lowSize, numProbes, {
-		type: PicoGL.FLOAT,
-		format: PicoGL.RED,
-		internalFormat: PicoGL.R16F,
-		minFilter: PicoGL.NEAREST,
-		magFilter: PicoGL.NEAREST
-	});
-
-	//
-	// Currently not octahedrals but actually a sphere-map (for spacial coherency & linear sampling)
-	//
-
-	irradianceFramebuffer = app.createFramebuffer();
 	probeOctahedrals['irradiance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGB,
@@ -771,17 +702,15 @@ function render() {
 		if (performPrecomputeThisFrame) {
 			let start = new Date().getTime();
 
-			//precompute();
-			precomputeProbe(precomputeIndex);
+			var realIndex = precomputeQueue[precomputeIndex++];
+			precomputeProbe(realIndex);
 
 			let end = new Date().getTime();
 			let timePassed = end - start;
-			console.log('Precompute for probe ' + precomputeIndex + ' took ' + timePassed + 'ms');
-			precomputeIndex++;
+			console.log('Precompute for probe ' + realIndex + ' took ' + timePassed + 'ms');
 
 			if (precomputeIndex == probeLocations.length) {
 				performPrecomputeThisFrame = false;
-				precomputeIndex = 0;
 			}
 		}
 
@@ -799,7 +728,7 @@ function render() {
 			var viewProjection = mat4.mul(mat4.create(), camera.projectionMatrix, camera.viewMatrix);
 
 			if (settings.render_probe_locations) {
-			renderProbeLocations(viewProjection);
+				renderProbeLocations(viewProjection);
 			}
 
 			var inverseViewProjection = mat4.invert(mat4.create(), viewProjection);
@@ -889,7 +818,6 @@ function renderScene() {
 		mesh.drawCall
 
 		// Default uniforms
-		//.uniform('u_camera_position', camera.position)
 		.uniform('u_world_from_local', mesh.modelMatrix)
 		.uniform('u_view_from_world', camera.viewMatrix)
 		.uniform('u_projection_from_view', camera.projectionMatrix)
@@ -904,16 +832,11 @@ function renderScene() {
 		.texture('u_environment_map', environmentMap)
 
 		// GI uniforms
-		//.texture('L.radianceProbeGrid', probeOctahedrals['radiance'])
-		//.texture('L.normalProbeGrid', probeOctahedrals['normals'])
-		//.texture('L.distanceProbeGrid', probeOctahedrals['distanceHigh'])
-		//.texture('L.lowResolutionDistanceProbeGrid', probeOctahedrals['distanceLow'])
 		.texture('L.irradianceProbeGrid', probeOctahedrals['irradiance'])
 		.texture('L.meanDistProbeGrid', probeOctahedrals['filteredDistance'])
 		.uniform('L.probeCounts', probeCount)
 		.uniform('L.probeStartPosition', probeOrigin)
 		.uniform('L.probeStep', probeStep)
-		.uniform('L.lowResolutionDownsampleFactor', lowPrecisionSizeDownsample)
 
 		.draw();
 
@@ -967,6 +890,19 @@ function renderEnvironment(inverseViewProjection) {
 
 }*/
 
+function initiatePrecompute() {
+
+	var queue = [];
+	for (var i = 0; i < probeLocations.length; ++i) {
+		queue.push(i);
+	}
+	precomputeQueue = shuffleArray(queue);
+
+	performPrecomputeThisFrame = true;
+	precomputeIndex = 0;
+
+}
+
 function precomputeProbe(index) {
 
 	//
@@ -978,7 +914,7 @@ function precomputeProbe(index) {
 	var projectionMatrix = mat4.create();
 	mat4.perspective(projectionMatrix, Math.PI / 2.0, 1.0, 0.1, 100.0);
 
-	var CUBE_LOOK_DIR = [
+	const CUBE_LOOK_DIR = [
 		vec3.fromValues(1.0, 0.0, 0.0),
 		vec3.fromValues(-1.0, 0.0, 0.0),
 		vec3.fromValues(0.0, 1.0, 0.0),
@@ -987,7 +923,7 @@ function precomputeProbe(index) {
 		vec3.fromValues(0.0, 0.0, -1.0)
 	];
 
-	var CUBE_LOOK_UP = [
+	const CUBE_LOOK_UP = [
 		vec3.fromValues(0.0, -1.0, 0.0),
 		vec3.fromValues(0.0, -1.0, 0.0),
 		vec3.fromValues(0.0, 0.0, 1.0),
@@ -996,19 +932,17 @@ function precomputeProbe(index) {
 		vec3.fromValues(0.0, -1.0, 0.0)
 	];
 
+	var viewMatrix = mat4.create();
+
 	for (var side = 0; side < 6; side++) {
 
-		var viewMatrix = mat4.create();
 		var lookPos = vec3.add(vec3.create(), location, CUBE_LOOK_DIR[side]);
 		mat4.lookAt(viewMatrix, location, lookPos, CUBE_LOOK_UP[side]);
 
 		var sideTarget = PicoGL.TEXTURE_CUBE_MAP_POSITIVE_X + side;
 		probeRenderingFramebuffer.colorTarget(0, probeCubemaps['radiance'], sideTarget);
-		probeRenderingFramebuffer.colorTarget(1, probeCubemaps['normals'], sideTarget);
-		probeRenderingFramebuffer.colorTarget(2, probeCubemaps['distance'], sideTarget);
+		probeRenderingFramebuffer.colorTarget(1, probeCubemaps['distance'], sideTarget);
 		probeRenderingFramebuffer.depthTarget(probeCubemaps['depth'], sideTarget);
-
-		validateFramebuffer(probeRenderingFramebuffer); // NOTE
 
 		// TODO: Fix this shit
 		// Create mock camera to be able to get the view space light direction. Probably clean this up some day...
@@ -1080,42 +1014,10 @@ function precomputeProbe(index) {
 	app.gl.flush();
 
 	//
-	// Project cubemaps to octahedrals
+	// Prefilter irradiance and map to octahedral
 	//
-
-	octahedralFramebuffer.colorTarget(0, probeOctahedrals['distanceHigh'], index);
-	octahedralFramebuffer.colorTarget(1, probeOctahedrals['radiance'], index);
-	octahedralFramebuffer.colorTarget(2, probeOctahedrals['normals'], index);
-
-	validateFramebuffer(octahedralFramebuffer); // NOTE!
-
-	octahedralFramebufferLow.colorTarget(0, probeOctahedrals['distanceLow'], index);
-
-	validateFramebuffer(octahedralFramebufferLow); // NOTE!
-
-	app.noDepthTest().noBlend();
-
-	octahedralDrawCall
-	.texture('u_radiance_cubemap', probeCubemaps['radiance'])
-	.texture('u_normals_cubemap', probeCubemaps['normals'])
-	.texture('u_distance_cubemap', probeCubemaps['distance']);
-
-	app.drawFramebuffer(octahedralFramebuffer)
-	.viewport(0, 0, probeOctahedralSize, probeOctahedralSize);
-	octahedralDrawCall.draw();
-
-	app.drawFramebuffer(octahedralFramebufferLow)
-	.viewport(0, 0, probeOctahedralSizeLow, probeOctahedralSizeLow);
-	octahedralDrawCall.draw();
-
-	//
-	// Prefilter irradiance
-	//
-
-	if(!irradianceDrawCall) return;
 
 	irradianceFramebuffer.colorTarget(0, probeOctahedrals['irradiance'], index);
-	validateFramebuffer(irradianceFramebuffer);
 
 	app.drawFramebuffer(irradianceFramebuffer)
 	.viewport(0, 0, irradianceSize, irradianceSize)
@@ -1128,11 +1030,10 @@ function precomputeProbe(index) {
 	.draw();
 
 	//
-	// Chebychev stuff (filter distances)
+	// Chebychev stuff (filter distances) and map to octahedral
 	//
 
 	irradianceFramebuffer.colorTarget(0, probeOctahedrals['filteredDistance'], index);
-	validateFramebuffer(irradianceFramebuffer);
 
 	app.drawFramebuffer(irradianceFramebuffer)
 	.viewport(0, 0, irradianceSize, irradianceSize)
