@@ -151,6 +151,23 @@ function makeShader(name, shaderLoaderData) {
 
 }
 
+function makeSingleColorTexture(color) {
+    var options = {};
+    options['minFilter'] = PicoGL.NEAREST;
+    options['magFilter'] = PicoGL.NEAREST;
+    options['mipmaps'] = false;
+    options['format'] = PicoGL.RGB;
+    options['internalFormat'] = PicoGL.RGB32F;
+    options['type'] = PicoGL.FLOAT;
+    var side = 32;
+    var arr =  [];
+    for (var i = 0; i < side*side; i++) {
+    	arr = arr.concat(color);
+	}
+    var image_data = new Float32Array( arr );
+    return app.createTexture2D(image_data, side, side, options);
+}
+
 function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 
 	var objLoader = new OBJLoader();
@@ -163,7 +180,12 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 			objects.forEach(function(object) {
 
 				var material = materials[object.material];
-				var diffuseMap  = (material.properties.map_Kd)   ? directory + material.properties.map_Kd   : 'default_diffuse.png';
+				var diffuseTexture;
+				if (material.properties.map_Kd) {
+                    diffuseTexture = loadTexture(directory + material.properties.map_Kd);
+                } else {
+					diffuseTexture = makeSingleColorTexture(material.properties.Kd);
+				}
 				var specularMap = (material.properties.map_Ks)   ? directory + material.properties.map_Ks   : 'default_specular.jpg';
 				var normalMap   = (material.properties.map_norm) ? directory + material.properties.map_norm : 'default_normal.jpg';
 
@@ -171,13 +193,13 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 
 				var drawCall = app.createDrawCall(defaultShader, vertexArray)
 				.uniformBlock('SceneUniforms', sceneUniforms)
-				.texture('u_diffuse_map', loadTexture(diffuseMap))
+				.texture('u_diffuse_map', diffuseTexture)
 				.texture('u_specular_map', loadTexture(specularMap))
 				.texture('u_normal_map', loadTexture(normalMap));
 
 				var precomputeDrawCall = app.createDrawCall(precomputeShader, vertexArray)
 				.uniformBlock('SceneUniforms', sceneUniforms)
-				.texture('u_diffuse_map', loadTexture(diffuseMap))
+				.texture('u_diffuse_map', diffuseTexture)
 				.texture('u_specular_map', loadTexture(specularMap))
 				.texture('u_normal_map', loadTexture(normalMap));
 
@@ -323,7 +345,7 @@ function init() {
 		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
 
-		{
+/*		{
 			let m = mat4.create();
 			let r = quat.fromEuler(quat.create(), 0, 0, 0);
 			let t = vec3.fromValues(0, 0, 0);
@@ -331,6 +353,17 @@ function init() {
 			mat4.fromRotationTranslationScale(m, r, t, s);
 			loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
 		}
+*/
+
+		{
+			let m = mat4.create();
+			let r = quat.fromEuler(quat.create(), 0, 0, 0);
+			let t = vec3.fromValues(0, 0, -7);
+			let s = vec3.fromValues(1.8, 1.8, 1.8);
+			mat4.fromRotationTranslationScale(m, r, t, s);
+			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
+		}
+
 /*
 		{
 			let m = mat4.create();
