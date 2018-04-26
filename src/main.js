@@ -15,9 +15,9 @@ var settings = {
 	debug_show_probe_map: 'irradiance',
 	debug_show_probe_map_options: ['irradiance', 'filteredDistance'],
 
-	irradiance_num_samples: 512,
+	irradiance_num_samples: 2048,
 	irradiance_lobe_size: 0.99,
-	filtered_distance_num_samples: 32,
+	filtered_distance_num_samples: 128,
 	filtered_distance_lobe_size: 0.12
 };
 
@@ -277,7 +277,7 @@ function init() {
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight(vec3.fromValues(0.35, -0.7, -1.0), vec3.fromValues(0.2, 0.2, 0.2));
+	directionalLight = new DirectionalLight(vec3.fromValues(0.27, -0.5, 0.8), vec3.fromValues(4.2, 4.2, 4.2));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
 	var spotPos = vec3.fromValues(-3.2, 2.2, 0.5);
@@ -351,7 +351,7 @@ function init() {
 
 		var irradianceShader = makeShader('irradianceMap', data);
 		irradianceDrawCall = app.createDrawCall(irradianceShader, fullscreenVertexArray);
-		irradianceDrawCall.uniformBlock('SphereSamples', createSpherSamplesUniformBuffer());
+		irradianceDrawCall.uniformBlock('SphereSamples', createSphereSamplesUniformBuffer());
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
@@ -547,7 +547,7 @@ function createPointsInSphere(count) {
 	return points;
 }
 
-function createSpherSamplesUniformBuffer() {
+function createSphereSamplesUniformBuffer() {
 
 	// Make sure this matches the value in the shader!
 	var size = 4096;
@@ -590,16 +590,25 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 
 function placeProbes() {
 
+	// Living room:
+	probeOrigin = vec3.fromValues(-2.9, 0.8, -4.0);
+	probeStep   = vec3.fromValues(2.3, 1.4, 3.0);
+	probeCount  = new Int32Array([4, 4, 4]);
+
+/*
+	// Test room:
 	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
 	probeStep   = vec3.fromValues(2.0, 2.0, 2.0);
 	probeCount  = new Int32Array([4, 4, 4]);
 
+*/
 /*
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
 */
 /*
+	// Sponza:
 	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
 	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
 	probeCount  = new Int32Array([4, 4, 4]);
@@ -1056,7 +1065,7 @@ function precomputeProbe(index) {
 
 			// Since we don't use HDR rendering on the main buffer, but sort of here, increase the brightness
 			// so that the environment appears brighter in reflections than in the sky (which would be/is saturated)
-			var brightness = settings.environment_brightness;// * 1.35; or not..?
+			var brightness = settings.environment_brightness * 5.0;
 
 			environmentDrawCall
 			.uniform('u_camera_position', camera.position)

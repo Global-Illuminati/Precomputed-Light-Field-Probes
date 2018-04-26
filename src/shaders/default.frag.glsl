@@ -149,9 +149,12 @@ void main()
 	vec3 fragment_world_space_normal = normalize(v_world_space_normal);
 
 	vec3 indirect_diffuse_light = computePrefilteredIrradiance(fragment_world_space_pos, fragment_world_space_normal);
-	color += 0.26 * diffuse * indirect_diffuse_light;
+	color += 1.0 * diffuse * indirect_diffuse_light;
 
 	//////////////////////////////////////////////////////////
+
+	// Debug render normals:
+	//color = 0.001 * color + packNormal(N);
 
 	o_color = vec4(color, 1.0);
 
