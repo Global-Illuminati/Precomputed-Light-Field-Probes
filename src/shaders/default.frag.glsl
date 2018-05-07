@@ -31,13 +31,15 @@ uniform sampler2D u_environment_map;
 
 uniform vec3 u_dir_light_color;
 uniform vec3 u_dir_light_view_direction;
+uniform float u_dir_light_multiplier;
 
 uniform vec3  u_spot_light_color;
 uniform float u_spot_light_cone;
 uniform vec3  u_spot_light_view_position;
 uniform vec3  u_spot_light_view_direction;
 
-uniform vec3 u_camera_position;
+uniform float u_indirect_multiplier;
+uniform float u_ambient_multiplier;
 
 ///////////////////////////////////
 // GI related
@@ -82,7 +84,7 @@ void main()
 
 	//////////////////////////////////////////////////////////
 	// ambient
-	vec3 color = u_ambient_color.rgb * diffuse;
+	vec3 color = u_ambient_multiplier * u_ambient_color.rgb * diffuse;
 
 	//////////////////////////////////////////////////////////
 	// directional light
@@ -103,13 +105,13 @@ void main()
 			vec3 wh = normalize(wi + wo);
 
 			// diffuse
-			color += visibility * diffuse * lambertian * u_dir_light_color;
+			color += visibility * diffuse * lambertian * u_dir_light_color * u_dir_light_multiplier;
 
 			// specular
 			float specular_angle = saturate(dot(N, wh));
 			float specular_power = pow(abs(2.0), 13.0 * shininess); // (fake glossiness from the specular map)
 			float specular = pow(abs(specular_angle), specular_power);
-			color += visibility * shininess * specular * u_dir_light_color;
+			color += visibility * shininess * specular * u_dir_light_color * u_dir_light_multiplier;
 		}
 	}
 
@@ -149,12 +151,14 @@ void main()
 	vec3 fragment_world_space_normal = normalize(v_world_space_normal);
 
 	vec3 indirect_diffuse_light = computePrefilteredIrradiance(fragment_world_space_pos, fragment_world_space_normal);
-	color += 1.0 * diffuse * indirect_diffuse_light;
+	color += u_indirect_multiplier * diffuse * indirect_diffuse_light;
 
 	//////////////////////////////////////////////////////////
 
 	// Debug render normals:
 	//color = 0.001 * color + packNormal(N);
+
+	color = color / (color + vec3(1.0));
 
 	o_color = vec4(color, 1.0);
 

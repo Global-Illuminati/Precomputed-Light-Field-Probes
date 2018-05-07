@@ -6,8 +6,10 @@ var stats;
 var gui;
 
 var settings = {
-	target_fps: 60,
-	environment_brightness: 1.5,
+	environment_brightness: 0.0,
+	directional_light_brightness: 13.0,
+	ambient_multiplier: 0.063,
+	indirect_multiplier: 0.24,
 
 	render_probe_locations: false,
 	do_debug_show_probe: false,
@@ -22,7 +24,7 @@ var settings = {
 };
 
 var sceneSettings = {
-	ambientColor: new Float32Array([0.0, 0.0, 0.0, 1.0]),
+	ambientColor: new Float32Array([1.0, 1.0, 1.0, 1.0]),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -106,6 +108,12 @@ function checkWebGL2Compability() {
 
 }
 
+function isDataTexture(imageName) {
+	return imageName.indexOf('_ddn') != -1
+		  || imageName.indexOf('_spec') != -1
+		  || imageName.indexOf('_normal') != -1;
+}
+
 function loadTexture(imageName, options) {
 
 	if (!options) {
@@ -114,6 +122,14 @@ function loadTexture(imageName, options) {
 		options['minFilter'] = PicoGL.LINEAR_MIPMAP_NEAREST;
 		options['magFilter'] = PicoGL.LINEAR;
 		options['mipmaps'] = true;
+
+		if (isDataTexture(imageName)) {
+			options['internalFormat'] = PicoGL.RGB8;
+			options['format'] = PicoGL.RGB;
+		} else {
+			options['internalFormat'] = PicoGL.SRGB8_ALPHA8;
+			options['format'] = PicoGL.RGBA;
+		}
 
 	}
 
@@ -125,6 +141,12 @@ function loadTexture(imageName, options) {
 
 		texture.resize(image.width, image.height);
 		texture.data(image);
+
+		// HACK: set anisotropy
+		var ext = app.gl.getExtension('EXT_texture_filter_anisotropic');
+		app.gl.bindTexture(PicoGL.TEXTURE_2D, texture.texture);
+		var maxAniso = app.gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+		app.gl.texParameterf(PicoGL.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
 
 		initiatePrecompute();
 
@@ -139,15 +161,16 @@ function makeSingleColorTexture(color) {
 	options['minFilter'] = PicoGL.NEAREST;
 	options['magFilter'] = PicoGL.NEAREST;
 	options['mipmaps'] = false;
-	options['format'] = PicoGL.RGB;
-	options['internalFormat'] = PicoGL.RGB32F;
+	options['format'] = PicoGL.RGBA;
+	options['internalFormat'] = PicoGL.SRGB8_ALPHA8;
 	options['type'] = PicoGL.FLOAT;
 	var side = 32;
 	var arr =  [];
 	for (var i = 0; i < side * side; i++) {
-		arr = arr.concat(color);
+		var colorByte = [color[0] * 255.99, color[1] * 255.99, color[2] * 255.99, 255];
+		arr = arr.concat(colorByte);
 	}
-	var image_data = new Float32Array(arr);
+	var image_data = new Uint8Array(arr);
 	return app.createTexture2D(image_data, side, side, options);
 }
 
@@ -239,6 +262,10 @@ function init() {
 	gui = new dat.GUI();
 	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness')
 	.onChange(function(value) { initiatePrecompute(); });
+	gui.add(settings, 'directional_light_brightness', 0.0, 20.0).name('Sun brightness')
+	.onChange(function(value) { initiatePrecompute(); });
+	gui.add(settings, 'ambient_multiplier', 0.0, 1.0).name('Ambient');
+	gui.add(settings, 'indirect_multiplier', 0.0, 1.0).name('Indirect');
 
 	var probe = gui.addFolder('Probe stuff');
 	probe.add({ f: function() { initiatePrecompute() }}, 'f').name('Precompute');
@@ -246,7 +273,6 @@ function init() {
 	probe.add(settings, 'do_debug_show_probe').name('Show probe');
 	probe.add(settings, 'debug_show_probe_index', 0, 64).name('... probe index');
 	probe.add(settings, 'debug_show_probe_map', settings.debug_show_probe_map_options).name('... texture');
-	probe.open();
 
 	var irradiance = probe.addFolder('Irradiance');
 	irradiance.add(settings, 'irradiance_num_samples', 1, 4096).name('Num samples');
@@ -270,17 +296,17 @@ function init() {
 	//////////////////////////////////////
 	// Camera stuff
 
-	var cameraPos = vec3.fromValues(-2, 1.75, -2);
-	var cameraRot = quat.fromEuler(quat.create(), -15, -150, 0);
+	var cameraPos = vec3.fromValues(-15.0, 3.0, 0.0);
+	var cameraRot = quat.fromEuler(quat.create(), 15.0, -90, 0);
 	camera = new Camera(cameraPos, cameraRot);
 
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight(vec3.fromValues(0.27, -0.5, 0.8), vec3.fromValues(4.2, 4.2, 4.2));
+	directionalLight = new DirectionalLight(vec3.fromValues(-0.2, -1.0, 0.333), vec3.fromValues(1, 1, 1));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
-	var spotPos = vec3.fromValues(-3.2, 2.2, 0.5);
+	var spotPos = vec3.fromValues(-3000.2, 2.2, 0.5);
 	var spotDir = vec3.fromValues(-1, 0, 0.3);
 	spotLight = new SpotLight(spotPos, spotDir, 20, vec3.fromValues(1.0, 0.6, 20.0));
 
@@ -366,7 +392,7 @@ function init() {
 		defaultShader = makeShader('default', data);
 		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
-
+/*
 		{
 			let m = mat4.create();
 			let r = quat.fromEuler(quat.create(), 0, 0, 0);
@@ -375,6 +401,7 @@ function init() {
 			mat4.fromRotationTranslationScale(m, r, t, s);
 			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
 		}
+*/
 /*
 		{
 			let m = mat4.create();
@@ -385,7 +412,7 @@ function init() {
 			loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
 		}
 */
-		//loadObject('sponza/', 'sponza.obj', 'sponza.mtl');
+		loadObject('sponza_with_teapot/', 'sponza_with_teapot.obj', 'sponza_with_teapot.mtl');
 /*
 		{
 			let m = mat4.create();
@@ -607,12 +634,12 @@ function placeProbes() {
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
 */
-/*
+
 	// Sponza:
-	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
-	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
-	probeCount  = new Int32Array([4, 4, 4]);
-*/
+	probeOrigin = vec3.fromValues(-22.0, 1.8, -8.0);
+	probeStep   = vec3.fromValues(15.6 / 2.0, 8.0 / 2.0, 5.35);
+	probeCount  = new Int32Array([8, 8, 4]);
+
 /*
 	probeOrigin = vec3.fromValues(-6.0, 1.5, -4.2);
 	probeStep   = vec3.fromValues(3.0, 3.0, 3.0);
@@ -739,8 +766,8 @@ function setupProbes(cubemapSize, irradianceOctahedralSize) {
 
 function resize() {
 
-	var w = window.innerWidth;
-	var h = window.innerHeight;
+	var w = 1920 * 0.75;//window.innerWidth;
+	var h = 1080 * 0.75;//window.innerHeight;
 
 	app.resize(w, h);
 	camera.resize(w, h);
@@ -892,12 +919,15 @@ function renderScene() {
 		.uniform('u_projection_from_view', camera.projectionMatrix)
 		.uniform('u_dir_light_color', directionalLight.color)
 		.uniform('u_dir_light_view_direction', dirLightViewDirection)
+		.uniform('u_dir_light_multiplier', settings.directional_light_brightness)
 		.uniform('u_light_projection_from_world', lightViewProjection)
 		.texture('u_shadow_map', shadowMap)
 		.uniform('u_spot_light_color', spotLight.color)
 		.uniform('u_spot_light_cone', spotLight.cone)
 		.uniform('u_spot_light_view_position', spotLightViewPosition)
 		.uniform('u_spot_light_view_direction', spotLightViewDirection)
+		.uniform('u_indirect_multiplier', settings.indirect_multiplier)
+		.uniform('u_ambient_multiplier', settings.ambient_multiplier)
 		.texture('u_environment_map', environmentMap)
 
 		// GI uniforms
@@ -1045,12 +1075,14 @@ function precomputeProbe(index) {
 			.uniform('u_projection_from_view', projectionMatrix)
 			.uniform('u_dir_light_color', directionalLight.color)
 			.uniform('u_dir_light_view_direction', dirLightViewDirection)
+			.uniform('u_dir_light_multiplier', settings.directional_light_brightness)
 			.uniform('u_light_projection_from_world', lightViewProjection)
 			.texture('u_shadow_map', shadowMap)
 			.uniform('u_spot_light_color', spotLight.color)
 			.uniform('u_spot_light_cone', spotLight.cone)
 			.uniform('u_spot_light_view_position', spotLightViewPosition)
 			.uniform('u_spot_light_view_direction', spotLightViewDirection)
+			.uniform('u_ambient_multiplier', settings.ambient_multiplier)
 			.draw();
 
 		}

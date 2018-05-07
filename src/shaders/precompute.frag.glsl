@@ -28,11 +28,14 @@ uniform sampler2D u_shadow_map;
 
 uniform vec3 u_dir_light_color;
 uniform vec3 u_dir_light_view_direction;
+uniform float u_dir_light_multiplier;
 
 uniform vec3  u_spot_light_color;
 uniform float u_spot_light_cone;
 uniform vec3  u_spot_light_view_position;
 uniform vec3  u_spot_light_view_direction;
+
+uniform float u_ambient_multiplier;
 
 layout(location = 0) out vec4 o_color;
 layout(location = 1) out vec4 o_distance;
@@ -61,7 +64,7 @@ void main()
 
 	//////////////////////////////////////////////////////////
 	// ambient
-	vec3 color = u_ambient_color.rgb * diffuse;
+	vec3 color = u_ambient_multiplier * u_ambient_color.rgb * diffuse;
 
 	//////////////////////////////////////////////////////////
 	// directional light
@@ -82,13 +85,13 @@ void main()
 			vec3 wh = normalize(wi + wo);
 
 			// diffuse
-			color += visibility * diffuse * lambertian * u_dir_light_color;
+			color += visibility * diffuse * lambertian * u_dir_light_color * u_dir_light_multiplier;
 
 			// specular
 			float specular_angle = saturate(dot(N, wh));
 			float specular_power = pow(abs(2.0), 13.0 * shininess); // (fake glossiness from the specular map)
 			float specular = pow(abs(specular_angle), specular_power);
-			color += visibility * shininess * specular * u_dir_light_color;
+			color += visibility * shininess * specular * u_dir_light_color * u_dir_light_multiplier;
 		}
 	}
 
