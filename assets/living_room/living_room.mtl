@@ -1,5 +1,5 @@
-# Blender MTL File: 'living_room_blend2_decimated_0_05_applied.blend'
-# Material Count: 40
+# Blender MTL File: 'living_room_blend2_decimated_0_05_applied_blocked.blend'
+# Material Count: 41
 
 newmtl Apple
 Ns 5.882353
@@ -170,6 +170,16 @@ illum 2
 map_Kd textures/wood4.jpg
 
 newmtl LampStand
+Ns 9.803922
+Ka 0.000000 0.000000 0.000000
+Kd 0.900000 0.900000 0.900000
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl LampStand.001
 Ns 9.803922
 Ka 0.000000 0.000000 0.000000
 Kd 0.900000 0.900000 0.900000

@@ -7,9 +7,9 @@ var gui;
 
 var settings = {
 	environment_brightness: 0.0,
-	directional_light_brightness: 13.0,
-	ambient_multiplier: 0.063,
-	indirect_multiplier: 0.24,
+	directional_light_brightness: 65.0,
+	ambient_multiplier: 0.21,//0.139,
+	indirect_multiplier: 0.54,//0.69,
 
 	render_probe_locations: false,
 	do_debug_show_probe: false,
@@ -20,7 +20,7 @@ var settings = {
 	irradiance_num_samples: 2048,
 	irradiance_lobe_size: 0.99,
 	filtered_distance_num_samples: 128,
-	filtered_distance_lobe_size: 0.12
+	filtered_distance_lobe_size: 0.50
 };
 
 var sceneSettings = {
@@ -262,7 +262,7 @@ function init() {
 	gui = new dat.GUI();
 	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness')
 	.onChange(function(value) { initiatePrecompute(); });
-	gui.add(settings, 'directional_light_brightness', 0.0, 40.0).name('Sun brightness')
+	gui.add(settings, 'directional_light_brightness', 0.0, 100.0).name('Sun brightness')
 	.onChange(function(value) { initiatePrecompute(); });
 	gui.add(settings, 'ambient_multiplier', 0.0, 1.0).name('Ambient');
 	gui.add(settings, 'indirect_multiplier', 0.0, 1.0).name('Indirect');
@@ -619,9 +619,13 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 function placeProbes() {
 
 	// Living room:
-	probeOrigin = vec3.fromValues(-1.6, 0.2, 1.5);
-	probeStep   = vec3.fromValues(1.4, 0.9, 2.0);
-	probeCount  = new Int32Array([4, 4, 4]);
+	//probeOrigin = vec3.fromValues(-1.6, 0.3, 1.8);
+	//probeStep   = vec3.fromValues(1.4, 1.2, 1.9);
+	//probeCount  = new Int32Array([4, 3, 4]);
+
+	probeOrigin = vec3.fromValues(-1.6, 0.3, 1.8);
+	probeStep   = vec3.fromValues(1.4 / 3.0 * 4.0, 1.2, 1.9 / 3.0 * 4.0);
+	probeCount  = new Int32Array([3, 3, 3]);
 
 /*
 	// Test room:
@@ -792,10 +796,12 @@ function render() {
 			let start = new Date().getTime();
 
 			var realIndex = precomputeQueue[precomputeIndex++];
-			precomputeProbe(realIndex);
+			if (realIndex < probeLocations.length)
+				precomputeProbe(realIndex);
 
 			var realIndex = precomputeQueue[precomputeIndex++];
-			precomputeProbe(realIndex);
+			if (realIndex < probeLocations.length)
+				precomputeProbe(realIndex);
 
 			let timePassed = new Date().getTime() - start;
 			precomputeTimes.push(timePassed);
