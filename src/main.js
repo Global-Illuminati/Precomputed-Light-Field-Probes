@@ -163,7 +163,7 @@ function makeSingleColorTexture(color) {
 	options['mipmaps'] = false;
 	options['format'] = PicoGL.RGBA;
 	options['internalFormat'] = PicoGL.SRGB8_ALPHA8;
-	options['type'] = PicoGL.FLOAT;
+	options['type'] = PicoGL.UNSIGNED_BYTE;
 	var side = 32;
 	var arr =  [];
 	for (var i = 0; i < side * side; i++) {
@@ -262,7 +262,7 @@ function init() {
 	gui = new dat.GUI();
 	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness')
 	.onChange(function(value) { initiatePrecompute(); });
-	gui.add(settings, 'directional_light_brightness', 0.0, 20.0).name('Sun brightness')
+	gui.add(settings, 'directional_light_brightness', 0.0, 40.0).name('Sun brightness')
 	.onChange(function(value) { initiatePrecompute(); });
 	gui.add(settings, 'ambient_multiplier', 0.0, 1.0).name('Ambient');
 	gui.add(settings, 'indirect_multiplier', 0.0, 1.0).name('Indirect');
@@ -296,14 +296,15 @@ function init() {
 	//////////////////////////////////////
 	// Camera stuff
 
-	var cameraPos = vec3.fromValues(-15.0, 3.0, 0.0);
-	var cameraRot = quat.fromEuler(quat.create(), 15.0, -90, 0);
+	var cameraPos = vec3.fromValues(2.62158, 1.68613, 3.62357);
+	var cameraRot = quat.fromEuler(quat.create(), 90-101, 180-70.2, 180+180);
 	camera = new Camera(cameraPos, cameraRot);
 
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight(vec3.fromValues(-0.2, -1.0, 0.333), vec3.fromValues(1, 1, 1));
+	var dir = vec3.fromValues(-0.15518534183502197, -0.22172605991363525, 0.962681233882904);
+	directionalLight = new DirectionalLight(dir, vec3.fromValues(1.0, 0.803, 0.433));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
 	var spotPos = vec3.fromValues(-3000.2, 2.2, 0.5);
@@ -392,16 +393,16 @@ function init() {
 		defaultShader = makeShader('default', data);
 		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
-/*
+
 		{
 			let m = mat4.create();
 			let r = quat.fromEuler(quat.create(), 0, 0, 0);
-			let t = vec3.fromValues(0, 0, -7);
-			let s = vec3.fromValues(1.8, 1.8, 1.8);
+			let t = vec3.fromValues(0, 0, 0);
+			let s = vec3.fromValues(1, 1, 1);
 			mat4.fromRotationTranslationScale(m, r, t, s);
 			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
 		}
-*/
+
 /*
 		{
 			let m = mat4.create();
@@ -412,7 +413,7 @@ function init() {
 			loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
 		}
 */
-		loadObject('sponza_with_teapot/', 'sponza_with_teapot.obj', 'sponza_with_teapot.mtl');
+		//loadObject('sponza_with_teapot/', 'sponza_with_teapot.obj', 'sponza_with_teapot.mtl');
 /*
 		{
 			let m = mat4.create();
@@ -618,8 +619,8 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 function placeProbes() {
 
 	// Living room:
-	probeOrigin = vec3.fromValues(-2.9, 0.8, -4.0);
-	probeStep   = vec3.fromValues(2.3, 1.4, 3.0);
+	probeOrigin = vec3.fromValues(-1.6, 0.2, 1.5);
+	probeStep   = vec3.fromValues(1.4, 0.9, 2.0);
 	probeCount  = new Int32Array([4, 4, 4]);
 
 /*
@@ -634,12 +635,12 @@ function placeProbes() {
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
 */
-
+/*
 	// Sponza:
 	probeOrigin = vec3.fromValues(-22.0, 1.8, -8.0);
 	probeStep   = vec3.fromValues(15.6 / 2.0, 8.0 / 2.0, 5.35);
 	probeCount  = new Int32Array([8, 8, 4]);
-
+*/
 /*
 	probeOrigin = vec3.fromValues(-6.0, 1.5, -4.2);
 	probeStep   = vec3.fromValues(3.0, 3.0, 3.0);

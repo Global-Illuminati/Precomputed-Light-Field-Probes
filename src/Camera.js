@@ -6,7 +6,7 @@ function Camera(position, orientation) {
 
 	this.near = 0.01;
 	this.far = 1000.0;
-	this.fovDegrees = 50;
+	this.fovDegrees = 60;
 
 	this.viewMatrix = mat4.create();
 	this.projectionMatrix = mat4.create();
