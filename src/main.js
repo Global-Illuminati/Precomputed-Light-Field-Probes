@@ -8,8 +8,8 @@ var gui;
 var settings = {
 	environment_brightness: 0.0,
 	directional_light_brightness: 65.0,
-	ambient_multiplier: 0.21,//0.139,
-	indirect_multiplier: 0.54,//0.69,
+	ambient_multiplier: 0.08,//0.21,//0.139,
+	indirect_multiplier: 0.56,//0.54,//0.69,
 
 	render_probe_locations: false,
 	do_debug_show_probe: false,
@@ -624,8 +624,8 @@ function placeProbes() {
 	//probeCount  = new Int32Array([4, 3, 4]);
 
 	probeOrigin = vec3.fromValues(-1.6, 0.3, 1.8);
-	probeStep   = vec3.fromValues(1.4 / 3.0 * 4.0, 1.2, 1.9 / 3.0 * 4.0);
-	probeCount  = new Int32Array([3, 3, 3]);
+	probeStep   = vec3.fromValues(1.4 / 3.0 * 4.0, 1.2, 1.9 / 3.0 * 4.0 * 0.67);
+	probeCount  = new Int32Array([3, 3, 4]);
 
 /*
 	// Test room:
