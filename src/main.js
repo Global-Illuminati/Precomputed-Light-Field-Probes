@@ -771,8 +771,8 @@ function setupProbes(cubemapSize, irradianceOctahedralSize) {
 
 function resize() {
 
-	var w = 1920 * 0.75;//window.innerWidth;
-	var h = 1080 * 0.75;//window.innerHeight;
+	var w = window.innerWidth;
+	var h = window.innerHeight;
 
 	app.resize(w, h);
 	camera.resize(w, h);
