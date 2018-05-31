@@ -22,7 +22,7 @@ The different branches in this repository contain slightly different variations 
 
 [diffuse-sponza](https://github.com/Global-Illuminati/Precomputed-Light-Field-Probes/tree/diffuse-sponza) branch has only diffuse indirect light and is adjusted for the sponza scene.
 
-[sponza-with-reflections](https://github.com/Global-Illuminati/Precomputed-Light-Field-Probes/tree/diffuse-sponza) implements the full technique with both diffuse and glossy indirect light, adjusted for the sponza scene. This is quite expensive to run for a weaker computer.
+[sponza-with-reflections](https://github.com/Global-Illuminati/Precomputed-Light-Field-Probes/tree/sponza-with-reflections) implements the full technique with both diffuse and glossy indirect light, adjusted for the sponza scene. This is quite expensive to run for a weaker computer.
 
 The [master](https://github.com/Global-Illuminati/Precomputed-Light-Field-Probes/tree/master) branch is identical to the diffuse-living-room branch and is used for providing a GitHub page as a demo.
 
