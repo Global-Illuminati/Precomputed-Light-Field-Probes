@@ -1,9 +1,9 @@
 # Precomputed Light Field Probes
 
-<img src="assets/generated/sponza.png" align="left" width="50%">
-<img src="assets/generated/living_room.png" align="left" width="50%">
-
 This is a WebGL 2.0 implementation of the paper ["Real-Time Global Illumination using Precomputed Light Field Probes"](http://research.nvidia.com/publication/real-time-global-illumination-using-precomputed-light-field-probes).
+
+![sponza](assets/generated/sponza.png)
+![living room](assets/generated/living_room.png)
 
 The code is based off of [our core framework](https://github.com/Global-Illuminati/CoreFramework/) and there further information regarding dependencies etc. can be found.
 
