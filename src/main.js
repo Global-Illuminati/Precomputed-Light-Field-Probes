@@ -6,10 +6,10 @@ var stats;
 var gui;
 
 var settings = {
-	environment_brightness: 0.0,
+	environment_brightness: 1.35,
 	directional_light_brightness: 65.0,
-	ambient_multiplier: 0.08,//0.21,//0.139,
-	indirect_multiplier: 0.56,//0.54,//0.69,
+	ambient_multiplier: 0.08,
+	indirect_multiplier: 0.56,
 
 	render_probe_locations: false,
 	do_debug_show_probe: false,
