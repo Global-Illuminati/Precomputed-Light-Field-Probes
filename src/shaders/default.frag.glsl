@@ -38,8 +38,6 @@ uniform float u_spot_light_cone;
 uniform vec3  u_spot_light_view_position;
 uniform vec3  u_spot_light_view_direction;
 
-uniform vec3 u_camera_position;
-
 uniform float u_indirect_multiplier;
 uniform float u_ambient_multiplier;
 
@@ -48,10 +46,6 @@ uniform float u_ambient_multiplier;
 
 uniform struct LightFieldSurface
 {
-	sampler2DArray          radianceProbeGrid;
-	sampler2DArray          normalProbeGrid;
-	sampler2DArray          distanceProbeGrid;
-	sampler2DArray          lowResolutionDistanceProbeGrid;
 	Vector3int32            probeCounts; // assumed to be a power of two!
 	Point3                  probeStartPosition;
 	Vector3                 probeStep;
@@ -60,7 +54,7 @@ uniform struct LightFieldSurface
 	sampler2DArray          meanDistProbeGrid;   // TODO: Size!
 } L;
 
-#include <light_field_probe.glsl>
+#include <light_field_probe_diffuse.glsl>
 
 ///////////////////////////////////
 
@@ -117,7 +111,7 @@ void main()
 			float specular_angle = saturate(dot(N, wh));
 			float specular_power = pow(abs(2.0), 13.0 * shininess); // (fake glossiness from the specular map)
 			float specular = pow(abs(specular_angle), specular_power);
-			color += visibility * shininess * specular * u_dir_light_color;
+			color += visibility * shininess * specular * u_dir_light_color * u_dir_light_multiplier;
 		}
 	}
 
@@ -156,15 +150,13 @@ void main()
 	vec3 fragment_world_space_pos = v_world_position;
 	vec3 fragment_world_space_normal = normalize(v_world_space_normal);
 
-	// TODO: Consider the specularity and energy conservation, yada yada...
-	vec3 fragment_to_camera_dir = normalize(u_camera_position - fragment_world_space_pos);
-	vec3 indirect_specular_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
-	color += u_indirect_multiplier * shininess * indirect_specular_light;
-
 	vec3 indirect_diffuse_light = computePrefilteredIrradiance(fragment_world_space_pos, fragment_world_space_normal);
-	color += 0.24 * diffuse * indirect_diffuse_light;
+	color += u_indirect_multiplier * diffuse * indirect_diffuse_light;
 
 	//////////////////////////////////////////////////////////
+
+	// Debug render normals:
+	//color = 0.001 * color + packNormal(N);
 
 	color = color / (color + vec3(1.0));
 

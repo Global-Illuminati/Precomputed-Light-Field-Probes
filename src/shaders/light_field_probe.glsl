@@ -805,7 +805,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 	ProbeIndex hit_probe_index;
 	vec2 hit_tex_coord;
 
-#define USE_ALT 0
+#define USE_ALT 1
 
 #if USE_ALT
 
@@ -828,7 +828,7 @@ vec3 compute_glossy_ray(LightFieldSurface L, vec3 world_space_pos, vec3 wo, vec3
 
 #else
 
-    const bool fill_holes = false;
+    const bool fill_holes = true;
 	if (!trace(L, world_space_ray, hit_distance, hit_tex_coord, hit_probe_index, fill_holes))
 	{
 		// TODO: Missed scene, use some fallback method
