@@ -1,12 +1,15 @@
 # Precomputed Light Field Probes
 
+<img src="assets/generated/sponza.png" align="left" width="50%">
+<img src="assets/generated/living_room.png" align="left" width="50%">
+
 This is a WebGL 2.0 implementation of the paper ["Real-Time Global Illumination using Precomputed Light Field Probes"](http://research.nvidia.com/publication/real-time-global-illumination-using-precomputed-light-field-probes).
 
 The code is based off of [our core framework](https://github.com/Global-Illuminati/CoreFramework/) and there further information regarding dependencies etc. can be found.
 
 ## Controls
 
-First-person WASD controls, plus Q and E for rolling. Press ctrl to take control of the camera and escape to release control. Force a new precompute sequence by pressing *P*. Rotate the directional light using up and down arrow keys, preferrably when not in control of the camera.
+First-person WASD controls, plus Q and E for rolling. Press *ctrl* to take control of the camera and *escape* to release control. Force a new precompute sequence by pressing *P*. Rotate the directional light using up and down arrow keys, preferrably when not in control of the camera.
 
 ## Glossy and diffuse indirect light
 
