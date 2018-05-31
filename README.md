@@ -1,3 +1,7 @@
+# DISCLAIMER
+
+This demo requires a lot of VRAM for all of the probes. Slower computers might not perform great and might even lock up!
+
 # Precomputed Light Field Probes
 
 This is a WebGL 2.0 implementation of the paper ["Real-Time Global Illumination using Precomputed Light Field Probes"](http://research.nvidia.com/publication/real-time-global-illumination-using-precomputed-light-field-probes).
