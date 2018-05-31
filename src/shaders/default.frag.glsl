@@ -31,6 +31,7 @@ uniform sampler2D u_environment_map;
 
 uniform vec3 u_dir_light_color;
 uniform vec3 u_dir_light_view_direction;
+uniform float u_dir_light_multiplier;
 
 uniform vec3  u_spot_light_color;
 uniform float u_spot_light_cone;
@@ -38,6 +39,9 @@ uniform vec3  u_spot_light_view_position;
 uniform vec3  u_spot_light_view_direction;
 
 uniform vec3 u_camera_position;
+
+uniform float u_indirect_multiplier;
+uniform float u_ambient_multiplier;
 
 ///////////////////////////////////
 // GI related
@@ -56,7 +60,7 @@ uniform struct LightFieldSurface
 	sampler2DArray          meanDistProbeGrid;   // TODO: Size!
 } L;
 
-#include <light_field_probe_nvidia.glsl>
+#include <light_field_probe.glsl>
 
 ///////////////////////////////////
 
@@ -86,7 +90,7 @@ void main()
 
 	//////////////////////////////////////////////////////////
 	// ambient
-	vec3 color = u_ambient_color.rgb * diffuse;
+	vec3 color = u_ambient_multiplier * u_ambient_color.rgb * diffuse;
 
 	//////////////////////////////////////////////////////////
 	// directional light
@@ -107,7 +111,7 @@ void main()
 			vec3 wh = normalize(wi + wo);
 
 			// diffuse
-			color += visibility * diffuse * lambertian * u_dir_light_color;
+			color += visibility * diffuse * lambertian * u_dir_light_color * u_dir_light_multiplier;
 
 			// specular
 			float specular_angle = saturate(dot(N, wh));
@@ -149,21 +153,27 @@ void main()
 	//////////////////////////////////////////////////////////
 	// indirect light
 
-	// TODO: Consider the specularity and energy conservation, yada yada...
 	vec3 fragment_world_space_pos = v_world_position;
 	vec3 fragment_world_space_normal = normalize(v_world_space_normal);
+
+	// TODO: Consider the specularity and energy conservation, yada yada...
 	vec3 fragment_to_camera_dir = normalize(u_camera_position - fragment_world_space_pos);
 	vec3 indirect_specular_light = compute_glossy_ray(L, fragment_world_space_pos, fragment_to_camera_dir, fragment_world_space_normal);
-
+/*
+	// Only do reflections on horizontal/floor surfaces
 	if (dot(vec3(0, 1, 0), fragment_world_space_normal) > 0.99)
 	{
-		color += 0.25 * shininess * indirect_specular_light;
+		color += u_indirect_multiplier * shininess * indirect_specular_light;
 	}
+*/
+	color += u_indirect_multiplier * shininess * indirect_specular_light;
 
 	vec3 indirect_diffuse_light = computePrefilteredIrradiance(fragment_world_space_pos, fragment_world_space_normal);
-	color += 0.26 * diffuse * indirect_diffuse_light;
+	color += 0.24 * diffuse * indirect_diffuse_light;
 
 	//////////////////////////////////////////////////////////
+
+	color = color / (color + vec3(1.0));
 
 	o_color = vec4(color, 1.0);
 

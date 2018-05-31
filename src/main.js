@@ -1,31 +1,30 @@
 'using strict';
 
-function validateFramebuffer(framebuffer) {
-	console.assert(framebuffer.getStatus() === PicoGL.FRAMEBUFFER_COMPLETE, "Framebuffer is not complete!");
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 var stats;
 var gui;
 
 var settings = {
-	target_fps: 60,
 	environment_brightness: 1.5,
+	directional_light_brightness: 13.0,
+	ambient_multiplier: 0.063,
+	indirect_multiplier: 0.24,
 
-	render_probe_locations: true,
+	render_probe_locations: false,
 	do_debug_show_probe: false,
 	debug_show_probe_index: 0,
 	debug_show_probe_map: 'radiance',
 	debug_show_probe_map_options: ['radiance', 'distanceHigh', 'distanceLow', 'normals', 'irradiance', 'filteredDistance'],
 
-	irradiance_num_samples: 512,
+	irradiance_num_samples: 2048,
 	irradiance_lobe_size: 0.99,
-	filtered_distance_lobe_size: 0.08
+	filtered_distance_num_samples: 128,
+	filtered_distance_lobe_size: 0.12
 };
 
 var sceneSettings = {
-	ambientColor: new Float32Array([0.0, 0.0, 0.0, 1.0]),
+	ambientColor: new Float32Array([1.0, 1.0, 1.0, 1.0]),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +55,11 @@ var camera;
 var spotLight;
 var directionalLight;
 var meshes = [];
+
 var performPrecomputeThisFrame = false;
+var precomputeIndex = 0;
+var precomputeQueue = [];
+var precomputeTimes;
 
 var probeDrawCall;
 var probeLocations;
@@ -65,6 +68,7 @@ var probeOrigin;
 var probeCount;
 var probeStep;
 
+// Octahedral stuff
 var octahedralDrawCall;
 var octahedralFramebuffer;
 var octahedralFramebufferLow;
@@ -78,14 +82,15 @@ var probeOctahedrals = {
 	irradiance: null
 };
 
+// Cubemap stuff
 var probeRenderingFramebuffer;
 var probeCubemaps = {};
 var probeCubeSize;
 
+// Octahedral irradiance stuff
 var irradianceDrawCall;
 var irradianceFramebuffer;
-var irradianceSize = 1024;//128;
-//filtered distance, squared distance as well..
+var irradianceSize = 128;
 
 window.addEventListener('DOMContentLoaded', function () {
 
@@ -116,6 +121,12 @@ function checkWebGL2Compability() {
 
 }
 
+function isDataTexture(imageName) {
+	return imageName.indexOf('_ddn') != -1
+		  || imageName.indexOf('_spec') != -1
+		  || imageName.indexOf('_normal') != -1;
+}
+
 function loadTexture(imageName, options) {
 
 	if (!options) {
@@ -124,6 +135,14 @@ function loadTexture(imageName, options) {
 		options['minFilter'] = PicoGL.LINEAR_MIPMAP_NEAREST;
 		options['magFilter'] = PicoGL.LINEAR;
 		options['mipmaps'] = true;
+
+		if (isDataTexture(imageName)) {
+			options['internalFormat'] = PicoGL.RGB8;
+			options['format'] = PicoGL.RGB;
+		} else {
+			options['internalFormat'] = PicoGL.SRGB8_ALPHA8;
+			options['format'] = PicoGL.RGBA;
+		}
 
 	}
 
@@ -136,10 +155,36 @@ function loadTexture(imageName, options) {
 		texture.resize(image.width, image.height);
 		texture.data(image);
 
+		// HACK: set anisotropy
+		var ext = app.gl.getExtension('EXT_texture_filter_anisotropic');
+		app.gl.bindTexture(PicoGL.TEXTURE_2D, texture.texture);
+		var maxAniso = app.gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+		app.gl.texParameterf(PicoGL.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
+
+		initiatePrecompute();
+
 	};
 	image.src = 'assets/' + imageName;
 	return texture;
 
+}
+
+function makeSingleColorTexture(color) {
+	var options = {};
+	options['minFilter'] = PicoGL.NEAREST;
+	options['magFilter'] = PicoGL.NEAREST;
+	options['mipmaps'] = false;
+	options['format'] = PicoGL.RGBA;
+	options['internalFormat'] = PicoGL.SRGB8_ALPHA8;
+	options['type'] = PicoGL.UNSIGNED_BYTE;
+	var side = 32;
+	var arr =  [];
+	for (var i = 0; i < side * side; i++) {
+		var colorByte = [color[0] * 255.99, color[1] * 255.99, color[2] * 255.99, 255];
+		arr = arr.concat(colorByte);
+	}
+	var image_data = new Uint8Array(arr);
+	return app.createTexture2D(image_data, side, side, options);
 }
 
 function makeShader(name, shaderLoaderData) {
@@ -162,7 +207,14 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 			objects.forEach(function(object) {
 
 				var material = materials[object.material];
-				var diffuseMap  = (material.properties.map_Kd)   ? directory + material.properties.map_Kd   : 'default_diffuse.png';
+
+				var diffuseTexture;
+				if (material.properties.map_Kd) {
+					diffuseTexture = loadTexture(directory + material.properties.map_Kd);
+				} else {
+					diffuseTexture = makeSingleColorTexture(material.properties.Kd);
+				}
+
 				var specularMap = (material.properties.map_Ks)   ? directory + material.properties.map_Ks   : 'default_specular.jpg';
 				var normalMap   = (material.properties.map_norm) ? directory + material.properties.map_norm : 'default_normal.jpg';
 
@@ -170,13 +222,13 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 
 				var drawCall = app.createDrawCall(defaultShader, vertexArray)
 				.uniformBlock('SceneUniforms', sceneUniforms)
-				.texture('u_diffuse_map', loadTexture(diffuseMap))
+				.texture('u_diffuse_map', diffuseTexture)
 				.texture('u_specular_map', loadTexture(specularMap))
 				.texture('u_normal_map', loadTexture(normalMap));
 
 				var precomputeDrawCall = app.createDrawCall(precomputeShader, vertexArray)
 				.uniformBlock('SceneUniforms', sceneUniforms)
-				.texture('u_diffuse_map', loadTexture(diffuseMap))
+				.texture('u_diffuse_map', diffuseTexture)
 				.texture('u_specular_map', loadTexture(specularMap))
 				.texture('u_normal_map', loadTexture(normalMap));
 
@@ -188,6 +240,8 @@ function loadObject(directory, objFilename, mtlFilename, modelMatrix) {
 					precomputeDrawCall: precomputeDrawCall,
 					shadowMapDrawCall: shadowMappingDrawCall
 				});
+
+				initiatePrecompute();
 
 			});
 		});
@@ -218,11 +272,15 @@ function init() {
 	picoPrecomputeTimer = app.createTimer();
 
 	gui = new dat.GUI();
-	gui.add(settings, 'target_fps', 0, 120).name('Target FPS');
-	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness');
+	gui.add(settings, 'environment_brightness', 0.0, 2.0).name('Environment brightness')
+	.onChange(function(value) { initiatePrecompute(); });
+	gui.add(settings, 'directional_light_brightness', 0.0, 20.0).name('Sun brightness')
+	.onChange(function(value) { initiatePrecompute(); });
+	gui.add(settings, 'ambient_multiplier', 0.0, 1.0).name('Ambient');
+	gui.add(settings, 'indirect_multiplier', 0.0, 1.0).name('Indirect');
 
 	var probe = gui.addFolder('Probe stuff');
-	probe.add({ f: function() { performPrecomputeThisFrame = true }}, 'f').name('Precompute');
+	probe.add({ f: function() { initiatePrecompute() }}, 'f').name('Precompute');
 	probe.add(settings, 'render_probe_locations').name('Render locations');
 	probe.add(settings, 'do_debug_show_probe').name('Show probe');
 	probe.add(settings, 'debug_show_probe_index', 0, 64).name('... probe index');
@@ -234,10 +292,11 @@ function init() {
 	irradiance.add(settings, 'irradiance_lobe_size', 0.0, 1.0).name('Cos lobe size');
 
 	var filteredDistance = probe.addFolder('Filtered distance');
+	filteredDistance.add(settings, 'filtered_distance_num_samples', 1, 128).name('Num samples');
 	filteredDistance.add(settings, 'filtered_distance_lobe_size', 0.0, 0.5).name('Cos lobe size');
 
 	window.addEventListener('keydown', function(e) {
-		if (e.keyCode == 80 /* p(recompute) */) performPrecomputeThisFrame = true;
+		if (e.keyCode == 80 /* p(recompute) */) initiatePrecompute();
 	});
 
 	//////////////////////////////////////
@@ -250,17 +309,17 @@ function init() {
 	//////////////////////////////////////
 	// Camera stuff
 
-	var cameraPos = vec3.fromValues(-2, 1.75, -2);
-	var cameraRot = quat.fromEuler(quat.create(), -15, -150, 0);
+	var cameraPos = vec3.fromValues(-15.0, 3.0, 0.0);
+	var cameraRot = quat.fromEuler(quat.create(), 15.0, -90, 0);
 	camera = new Camera(cameraPos, cameraRot);
 
 	//////////////////////////////////////
 	// Scene setup
 
-	directionalLight = new DirectionalLight();//vec3.fromValues(0.35, -0.7, -1.0), vec3.fromValues(0.2, 0.2, 0.2));
+	directionalLight = new DirectionalLight(vec3.fromValues(-0.2, -1.0, 0.333), vec3.fromValues(1, 1, 1));
 	setupDirectionalLightShadowMapFramebuffer(shadowMapSize);
 
-	var spotPos = vec3.fromValues(-3.2, 2.2, 0.5);
+	var spotPos = vec3.fromValues(-3000.2, 2.2, 0.5);
 	var spotDir = vec3.fromValues(-1, 0, 0.3);
 	spotLight = new SpotLight(spotPos, spotDir, 20, vec3.fromValues(1.0, 0.6, 20.0));
 
@@ -278,7 +337,7 @@ function init() {
 	shaderLoader.addShaderFile('octahedral.glsl')
 	shaderLoader.addShaderFile('scene_uniforms.glsl');
 	shaderLoader.addShaderFile('mesh_attributes.glsl');
-	shaderLoader.addShaderFile('light_field_probe_nvidia.glsl');
+	shaderLoader.addShaderFile('light_field_probe.glsl');
 	shaderLoader.addShaderProgram('unlit', 'unlit.vert.glsl', 'unlit.frag.glsl');
 	shaderLoader.addShaderProgram('default', 'default.vert.glsl', 'default.frag.glsl');
 	shaderLoader.addShaderProgram('precompute', 'default.vert.glsl', 'precompute.frag.glsl');
@@ -305,7 +364,7 @@ function init() {
 
 		var irradianceShader = makeShader('irradianceMap', data);
 		irradianceDrawCall = app.createDrawCall(irradianceShader, fullscreenVertexArray);
-		irradianceDrawCall.uniformBlock('SphereSamples', createSpherSamplesUniformBuffer());
+		irradianceDrawCall.uniformBlock('SphereSamples', createSphereSamplesUniformBuffer());
 
 		var environmentShader = makeShader('environment', data);
 		environmentDrawCall = app.createDrawCall(environmentShader, fullscreenVertexArray)
@@ -321,7 +380,7 @@ function init() {
 		precomputeShader = makeShader('precompute', data);
 		shadowMapShader = makeShader('shadowMapping', data);
 
-		{
+/*		{
 			let m = mat4.create();
 			let r = quat.fromEuler(quat.create(), 0, 0, 0);
 			let t = vec3.fromValues(0, 0, 0);
@@ -329,6 +388,17 @@ function init() {
 			mat4.fromRotationTranslationScale(m, r, t, s);
 			//loadObject('test_room/', 'test_room.obj', 'test_room.mtl', m);
 		}
+*/
+/*
+		{
+			let m = mat4.create();
+			let r = quat.fromEuler(quat.create(), 0, 0, 0);
+			let t = vec3.fromValues(0, 0, -7);
+			let s = vec3.fromValues(1.8, 1.8, 1.8);
+			mat4.fromRotationTranslationScale(m, r, t, s);
+			loadObject('living_room/', 'living_room.obj', 'living_room.mtl', m);
+		}
+*/
 /*
 		{
 			let m = mat4.create();
@@ -359,7 +429,7 @@ function init() {
 			loadObject('quad/', 'quad.obj', 'quad.mtl', m);
 		}
 */
-		setupProbes(1024, 1024);
+		setupProbes(256, 1024);
 
 	});
 
@@ -489,6 +559,22 @@ function setupSceneUniforms() {
 
 }
 
+function shuffleArray(array) {
+
+	let counter = array.length;
+
+	while (counter > 0) {
+		let index = Math.floor(Math.random() * counter);
+
+		counter -= 1;
+		let temp = array[counter];
+		array[counter] = array[index];
+		array[index] = temp;
+	}
+
+	return array;
+}
+
 function createPointsInSphere(count) {
 
 	var size = count * 3;
@@ -516,7 +602,7 @@ function createPointsInSphere(count) {
 	return points;
 }
 
-function createSpherSamplesUniformBuffer() {
+function createSphereSamplesUniformBuffer() {
 
 	// Make sure this matches the value in the shader!
 	var size = 4096;
@@ -559,20 +645,28 @@ function createVertexArrayFromMeshInfo(meshInfo) {
 
 function placeProbes() {
 /*
-	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
-	probeStep   = vec3.fromValues(6.5, 2.0, 6.5);
-	probeCount  = new Int32Array([2, 2, 2]);
+	// Living room:
+	probeOrigin = vec3.fromValues(-2.9, 0.8, -4.0);
+	probeStep   = vec3.fromValues(2.3, 1.4, 3.0);
+	probeCount  = new Int32Array([4, 4, 4]);
 */
+/*
+	// Test room:
+	probeOrigin = vec3.fromValues(-3.0, 1.0, -3.0);
+	probeStep   = vec3.fromValues(2.0, 2.0, 2.0);
+	probeCount  = new Int32Array([4, 4, 4]);
 
+*/
 /*
 	probeOrigin = vec3.fromValues(-1.5, 0.25, 2.5);
 	probeStep   = vec3.fromValues(2.5, 2.5, 2.5);
 	probeCount  = new Int32Array([2, 2, 2]);
 */
 
-	probeOrigin = vec3.fromValues(-22.0, 6.0, -8.0);
-	probeStep   = vec3.fromValues(15.6, 8.0, 5.35);
-	probeCount  = new Int32Array([4, 4, 4]);
+	// Sponza:
+	probeOrigin = vec3.fromValues(-22.0, 2.0, -8.0);
+	probeStep   = vec3.fromValues(15.6 / 2.0, 8.0 / 2.0, 5.35);
+	probeCount  = new Int32Array([8, 8, 4]);
 
 /*
 	probeOrigin = vec3.fromValues(-6.0, 1.5, -4.2);
@@ -638,9 +732,9 @@ function setupProbes(cubemapSize, octahedralSize) {
 	probeCubemaps['radiance'] = app.createCubemap({
 		width: cubemapSize,
 		height: cubemapSize,
-		type: PicoGL.FLOAT,
+		type: PicoGL.HALF_FLOAT,
 		format: PicoGL.RGBA,
-		internalFormat: PicoGL.RGBA32F
+		internalFormat: PicoGL.RGBA16F
 	});
 
 	probeCubemaps['depth'] = app.createCubemap({
@@ -648,7 +742,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 		height: cubemapSize,
 		type: PicoGL.FLOAT,
 		format: PicoGL.DEPTH_COMPONENT,
-		internalFormat: PicoGL.DEPTH_COMPONENT32F
+		internalFormat: PicoGL.DEPTH_COMPONENT16F
 	});
 
 	probeCubemaps['normals'] = app.createCubemap({
@@ -656,7 +750,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 		height: cubemapSize,
 		type: PicoGL.FLOAT,
 		format: PicoGL.RGBA,
-		internalFormat: PicoGL.RGBA32F
+		internalFormat: PicoGL.RGBA16F
 	});
 
 	probeCubemaps['distance'] = app.createCubemap({
@@ -733,7 +827,7 @@ function setupProbes(cubemapSize, octahedralSize) {
 	probeOctahedrals['filteredDistance'] = app.createTextureArray(irradianceSize, irradianceSize, numProbes, {
 		type: PicoGL.FLOAT,
 		format: PicoGL.RG,
-		internalFormat: PicoGL.RG16F,
+		internalFormat: PicoGL.RG32F,
 		minFilter: PicoGL.LINEAR,
 		magFilter: PicoGL.LINEAR,
 		wrapS: PicoGL.CLAMP_TO_EDGE,
@@ -768,19 +862,26 @@ function render() {
 		renderShadowMap();
 
 		if (performPrecomputeThisFrame) {
-
 			let start = new Date().getTime();
 
-			app.gl.finish();
-			precompute();
-			app.gl.finish();
+			var realIndex = precomputeQueue[precomputeIndex++];
+			precomputeProbe(realIndex);
 
-			let end = new Date().getTime();
-			let timePassed = end - start;
-			console.log('Precompute took ' + timePassed + 'ms');
+			var realIndex = precomputeQueue[precomputeIndex++];
+			precomputeProbe(realIndex);
 
-			performPrecomputeThisFrame = false;
+			let timePassed = new Date().getTime() - start;
+			precomputeTimes.push(timePassed);
 
+			if (precomputeIndex == probeLocations.length) {
+
+				var averageTime = precomputeTimes.reduce((acc, x) => acc + x) / probeLocations.length;
+				console.log('Average probe precompute time: '  + averageTime + 'ms');
+
+				performPrecomputeThisFrame = false;
+				precomputeIndex = 0;
+				precomputeTimes = [];
+			}
 		}
 
 		if (settings.do_debug_show_probe) {
@@ -893,12 +994,15 @@ function renderScene() {
 		.uniform('u_projection_from_view', camera.projectionMatrix)
 		.uniform('u_dir_light_color', directionalLight.color)
 		.uniform('u_dir_light_view_direction', dirLightViewDirection)
+		.uniform('u_dir_light_multiplier', settings.directional_light_brightness)
 		.uniform('u_light_projection_from_world', lightViewProjection)
 		.texture('u_shadow_map', shadowMap)
 		.uniform('u_spot_light_color', spotLight.color)
 		.uniform('u_spot_light_cone', spotLight.cone)
 		.uniform('u_spot_light_view_position', spotLightViewPosition)
 		.uniform('u_spot_light_view_direction', spotLightViewDirection)
+		.uniform('u_indirect_multiplier', settings.indirect_multiplier)
+		.uniform('u_ambient_multiplier', settings.ambient_multiplier)
 		.texture('u_environment_map', environmentMap)
 
 		// GI uniforms
@@ -957,11 +1061,22 @@ function renderEnvironment(inverseViewProjection) {
 
 }
 
-function precompute() {
+function initiatePrecompute() {
 
-	for (var i = 0, len = probeLocations.length; i < len; ++i) {
-		precomputeProbe(i)
+	if (!probeLocations) {
+		return;
 	}
+
+	var queue = [];
+	for (var i = 0; i < probeLocations.length; ++i) {
+		queue.push(i);
+	}
+	precomputeQueue = shuffleArray(queue);
+
+	performPrecomputeThisFrame = true;
+	precomputeIndex = 0;
+
+	precomputeTimes = [];
 
 }
 
@@ -1006,8 +1121,6 @@ function precomputeProbe(index) {
 		probeRenderingFramebuffer.colorTarget(2, probeCubemaps['distance'], sideTarget);
 		probeRenderingFramebuffer.depthTarget(probeCubemaps['depth'], sideTarget);
 
-		validateFramebuffer(probeRenderingFramebuffer); // NOTE
-
 		// TODO: Fix this shit
 		// Create mock camera to be able to get the view space light direction. Probably clean this up some day...
 		var matrix3 = mat3.create();
@@ -1042,12 +1155,14 @@ function precomputeProbe(index) {
 			.uniform('u_projection_from_view', projectionMatrix)
 			.uniform('u_dir_light_color', directionalLight.color)
 			.uniform('u_dir_light_view_direction', dirLightViewDirection)
+			.uniform('u_dir_light_multiplier', settings.directional_light_brightness)
 			.uniform('u_light_projection_from_world', lightViewProjection)
 			.texture('u_shadow_map', shadowMap)
 			.uniform('u_spot_light_color', spotLight.color)
 			.uniform('u_spot_light_cone', spotLight.cone)
 			.uniform('u_spot_light_view_position', spotLightViewPosition)
 			.uniform('u_spot_light_view_direction', spotLightViewDirection)
+			.uniform('u_ambient_multiplier', settings.ambient_multiplier)
 			.draw();
 
 		}
@@ -1085,11 +1200,7 @@ function precomputeProbe(index) {
 	octahedralFramebuffer.colorTarget(1, probeOctahedrals['radiance'], index);
 	octahedralFramebuffer.colorTarget(2, probeOctahedrals['normals'], index);
 
-	validateFramebuffer(octahedralFramebuffer); // NOTE!
-
 	octahedralFramebufferLow.colorTarget(0, probeOctahedrals['distanceLow'], index);
-
-	validateFramebuffer(octahedralFramebufferLow); // NOTE!
 
 	app.noDepthTest().noBlend();
 
@@ -1110,10 +1221,7 @@ function precomputeProbe(index) {
 	// Prefilter irradiance
 	//
 
-	if(!irradianceDrawCall) return;
-
 	irradianceFramebuffer.colorTarget(0, probeOctahedrals['irradiance'], index);
-	validateFramebuffer(irradianceFramebuffer);
 
 	app.drawFramebuffer(irradianceFramebuffer)
 	.viewport(0, 0, irradianceSize, irradianceSize)
@@ -1130,7 +1238,6 @@ function precomputeProbe(index) {
 	//
 
 	irradianceFramebuffer.colorTarget(0, probeOctahedrals['filteredDistance'], index);
-	validateFramebuffer(irradianceFramebuffer);
 
 	app.drawFramebuffer(irradianceFramebuffer)
 	.viewport(0, 0, irradianceSize, irradianceSize)
@@ -1138,7 +1245,7 @@ function precomputeProbe(index) {
 
 	irradianceDrawCall
 	.texture('u_radiance_cubemap', probeCubemaps['distance'])
-	.uniform('u_num_samples', settings.irradiance_num_samples)
+	.uniform('u_num_samples', settings.filtered_distance_num_samples)
 	.uniform('u_lobe_size', settings.filtered_distance_lobe_size)
 	.draw();
 
